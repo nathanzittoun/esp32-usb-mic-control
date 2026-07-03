@@ -1,0 +1,660 @@
+:root {
+  --wcm-red: #b31b1b;
+  --wcm-dark-red: #7f1212;
+  --wcm-orange: #f58220;
+
+  --bg: #f5f5f7;
+  --card: rgba(255, 255, 255, 0.86);
+  --card-solid: #ffffff;
+  --plot-bg: #f0f0f2;
+  --plot-grid: #d8d8dc;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #dcdce0;
+  --soft-line: #ececf0;
+
+  --green: #18794e;
+  --purple: #7c3aed;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Arial, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(179, 27, 27, 0.08), transparent 28%),
+    linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+  color: var(--ink);
+}
+
+.appShell {
+  max-width: 1240px;
+  margin: 28px auto;
+  padding: 0 22px 34px;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 22px;
+  padding: 22px 26px;
+  background: var(--card);
+  border: 1px solid var(--soft-line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.logo {
+  width: 360px;
+  max-width: 42vw;
+  object-fit: contain;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.7px;
+}
+
+.brand p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.deviceStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+  justify-content: flex-end;
+}
+
+.statusDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #b8b8bd;
+}
+
+.statusDot.connected {
+  background: var(--green);
+}
+
+.statusDot.recording {
+  background: var(--wcm-red);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.65; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.statusText {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.statusSubtext {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tabBar {
+  display: flex;
+  gap: 8px;
+  margin: 20px auto;
+  padding: 6px;
+  background: #e9e9ed;
+  width: fit-content;
+  border-radius: 999px;
+}
+
+.tabBtn {
+  border: none;
+  padding: 11px 24px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tabBtn.active {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+
+.view {
+  display: none;
+}
+
+.activeView {
+  display: block;
+}
+
+.gridTwo {
+  display: grid;
+  grid-template-columns: 1.45fr 0.8fr;
+  gap: 22px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--soft-line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+  backdrop-filter: blur(18px);
+}
+
+.mainCard {
+  min-height: 640px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.sectionHeader.compact {
+  margin-bottom: 16px;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.5px;
+}
+
+.sectionHeader p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.buttonRow,
+.analysisToolbar,
+.quickZoomRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  align-items: flex-end;
+}
+
+button,
+select,
+input {
+  font-family: inherit;
+}
+
+button {
+  border: none;
+  border-radius: 16px;
+  padding: 13px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.14);
+}
+
+button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.primaryBtn {
+  background: var(--ink);
+  color: white;
+}
+
+.successBtn {
+  background: var(--green);
+  color: white;
+}
+
+.warningBtn {
+  background: var(--wcm-orange);
+  color: white;
+}
+
+.secondaryBtn {
+  background: #ececf0;
+  color: var(--ink);
+}
+
+.modeSelector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 10px 0 20px;
+}
+
+.modeBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  background: #f1f1f4;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 16px;
+  text-align: left;
+}
+
+.modeBtn span {
+  font-size: 16px;
+}
+
+.modeBtn small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.modeBtn.active {
+  background: var(--ink);
+  color: white;
+  border-color: var(--ink);
+}
+
+.modeBtn.active small {
+  color: rgba(255,255,255,0.75);
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.metaBox,
+.countPill {
+  background: #f1f1f4;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.plotCard {
+  background: var(--card-solid);
+  border: 1px solid var(--soft-line);
+  border-radius: 22px;
+  padding: 18px;
+}
+
+.plotHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.plotHeader h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.plotHeader span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+canvas {
+  width: 100%;
+  background: var(--plot-bg);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  display: block;
+}
+
+#waveform {
+  height: 300px;
+}
+
+#spectrumCanvas {
+  height: 420px;
+}
+
+.noiseDashboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.noiseCard {
+  background: white;
+  border: 1px solid var(--soft-line);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.noiseLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.noiseValue {
+  font-size: 21px;
+  font-weight: 800;
+  margin-bottom: 9px;
+}
+
+.indicatorOuter {
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #ececf0;
+}
+
+.indicatorInner {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--green);
+  transition: width 0.08s linear;
+}
+
+.indicatorInner.warning {
+  background: var(--wcm-orange);
+}
+
+.indicatorInner.danger {
+  background: var(--wcm-red);
+}
+
+.noiseFloorBox {
+  margin-top: 14px;
+  background: white;
+  border: 1px solid var(--soft-line);
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.noiseFloorValue {
+  font-weight: 800;
+  font-size: 22px;
+  margin: 4px 0;
+}
+
+.noiseComment {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldGroup label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+}
+
+select,
+input {
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  padding: 0 12px;
+  font-size: 15px;
+  min-width: 130px;
+}
+
+#analysisSourceSelect {
+  min-width: 220px;
+}
+
+.zoomPresetBtn {
+  background: white;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.analysisSummary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.analysisSummary div {
+  background: white;
+  border: 1px solid var(--soft-line);
+  border-radius: 20px;
+  padding: 18px;
+}
+
+.analysisSummary h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.analysisSummary p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.recordingList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+}
+
+.recordingCard {
+  background: white;
+  border: 1px solid var(--soft-line);
+  border-radius: 22px;
+  padding: 18px;
+}
+
+.recordingTitle {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+
+.recordingInfo {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+  line-height: 1.35;
+}
+
+audio {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.cardButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.smallBtn {
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.downloadBtn {
+  background: var(--ink);
+  color: white;
+}
+
+.analyzeBtn {
+  background: #ececf0;
+  color: var(--ink);
+}
+
+.deleteBtn {
+  background: #f3e8e8;
+  color: var(--wcm-red);
+}
+
+.empty {
+  background: white;
+  border: 1px dashed var(--line);
+  border-radius: 22px;
+  padding: 32px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.logBox {
+  margin-top: 18px;
+  background: rgba(255,255,255,0.68);
+  border: 1px solid var(--soft-line);
+  border-radius: 20px;
+  padding: 12px 14px;
+  height: 95px;
+  overflow-y: auto;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sourceSelector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sourceBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  background: #f1f1f4;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 16px;
+  text-align: left;
+}
+
+.sourceBtn span {
+  font-size: 16px;
+}
+
+.sourceBtn small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sourceBtn.active {
+  background: var(--wcm-red);
+  color: white;
+  border-color: var(--wcm-dark-red);
+}
+
+.sourceBtn.active small {
+  color: rgba(255,255,255,0.75);
+}
+
+@media (max-width: 980px) {
+  .topBar,
+  .brand {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sourceSelector {
+    grid-template-columns: 1fr;
+  }
+
+  .logo {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .gridTwo,
+  .analysisSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .modeSelector {
+    grid-template-columns: 1fr;
+  }
+
+  .noiseDashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .tabBar {
+    width: 100%;
+  }
+
+  .tabBtn {
+    flex: 1;
+  }
+}
+
+.noiseOn {
+  background: #0f7b3f !important;
+  color: white !important;
+  border-color: #0f7b3f !important;
+}
+
+.waveformAnalyzeCard {
+  margin-top: 18px;
+}
+
+#analysisWaveformCanvas {
+  height: 260px;
+  cursor: crosshair;
+}
+
+.selectionHelp {
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.selectionHandle {
+  cursor: ew-resize;
+}

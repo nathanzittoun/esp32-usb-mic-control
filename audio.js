@@ -1,0 +1,323 @@
+function setAudioMode(mode) {
+  if (isRecording) {
+    log("Cannot change mic mode while recording.");
+    return;
+  }
+
+  audioMode = mode;
+
+  document.querySelectorAll(".modeBtn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === mode);
+  });
+
+  updateCurrentStats();
+  log("Mode selected: " + mode + ".");
+}
+
+function addSamples(payloadBytes) {
+  if (!isRecording) {
+    return;
+  }
+
+  const view = new DataView(
+    payloadBytes.buffer,
+    payloadBytes.byteOffset,
+    payloadBytes.byteLength
+  );
+
+  const frameCount = payloadBytes.byteLength / 4;
+
+  let outputSamples;
+
+  if (audioMode === "stereo") {
+    outputSamples = new Int16Array(frameCount * 2);
+  } else {
+    outputSamples = new Int16Array(frameCount);
+  }
+
+  for (let i = 0; i < frameCount; i++) {
+    const right = view.getInt16(i * 4, true);
+    const left = view.getInt16(i * 4 + 2, true);
+
+    if (audioMode === "stereo") {
+      outputSamples[i * 2] = right;
+      outputSamples[i * 2 + 1] = left;
+    } else if (audioMode === "left") {
+      outputSamples[i] = left;
+    } else if (audioMode === "right") {
+      outputSamples[i] = right;
+    }
+  }
+
+  const channelCount = audioMode === "stereo" ? 2 : 1;
+
+  outputSamples = processNoiseAttenuator(outputSamples, channelCount);
+
+  for (let i = 0; i < frameCount; i++) {
+    if (audioMode === "stereo") {
+      const right = outputSamples[i * 2];
+      const left = outputSamples[i * 2 + 1];
+      liveSamples.push(Math.round((right + left) / 2));
+    } else {
+      liveSamples.push(outputSamples[i]);
+    }
+  }
+
+  currentChunks.push(outputSamples);
+  currentFrameCount += frameCount;
+  currentValueCount += outputSamples.length;
+
+  if (liveSamples.length > MAX_LIVE_SAMPLES) {
+    liveSamples = liveSamples.slice(liveSamples.length - MAX_LIVE_SAMPLES);
+  }
+
+  updateCurrentStats();
+  drawLiveWaveform();
+  updateNoiseIndicators(liveSamples);
+}
+
+function makeAnalysisSamples(samples, mode) {
+  if (mode !== "stereo") {
+    return Int16Array.from(samples);
+  }
+
+  const frameCount = Math.floor(samples.length / 2);
+  const mono = new Int16Array(frameCount);
+
+  for (let i = 0; i < frameCount; i++) {
+    const right = samples[i * 2];
+    const left = samples[i * 2 + 1];
+    mono[i] = Math.round((right + left) / 2);
+  }
+
+  return mono;
+}
+
+function saveCurrentRecording() {
+  const numChannels = audioMode === "stereo" && inputSource === "mems" ? 2 : 1;
+  const samples = mergeChunks(currentChunks, currentValueCount);
+  const analysisSamples = makeAnalysisSamples(samples, numChannels === 2 ? "stereo" : "mono");
+  const wavBuffer = encodeWav(samples, SAMPLE_RATE, numChannels);
+
+  const blob = new Blob([wavBuffer], {
+    type: "audio/wav"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const duration = currentFrameCount / SAMPLE_RATE;
+
+  const sourceLabel = inputSource === "mems" ? "MEMS" : "Computer mic";
+
+  const recording = {
+    id: Date.now(),
+    number: recordingIndex++,
+    frames: currentFrameCount,
+    values: currentValueCount,
+    duration,
+    channels: numChannels,
+    mode: inputSource === "mems" ? audioMode : "computer",
+    source: sourceLabel,
+    samples,
+    analysisSamples,
+    blob,
+    url,
+    createdAt: new Date()
+  };
+
+  recordings.unshift(recording);
+
+  renderRecordings();
+  updateAnalysisSourceSelect();
+
+  log("Recording " + recording.number + " saved from " + sourceLabel + ".");
+}
+
+function mergeChunks(chunks, totalValues) {
+  const samples = new Int16Array(totalValues);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    samples.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return samples;
+}
+
+function encodeWav(samples, sampleRate, numChannels) {
+  const bytesPerSample = 2;
+  const blockAlign = numChannels * bytesPerSample;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = samples.length * bytesPerSample;
+
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  writeString(view, 0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(view, 8, "WAVE");
+
+  writeString(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+
+  writeString(view, 36, "data");
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+
+  for (let i = 0; i < samples.length; i++) {
+    view.setInt16(offset, samples[i], true);
+    offset += 2;
+  }
+
+  return buffer;
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+function renderRecordings() {
+  recordingList.innerHTML = "";
+
+  recordingCount.textContent = recordings.length + " saved";
+
+  if (recordings.length === 0) {
+    recordingList.innerHTML = '<div class="empty">No recordings yet.</div>';
+    return;
+  }
+
+  for (const recording of recordings) {
+    const card = document.createElement("div");
+    card.className = "recordingCard";
+
+    const title = document.createElement("div");
+    title.className = "recordingTitle";
+    title.textContent = "Recording " + recording.number;
+
+    const info = document.createElement("div");
+    info.className = "recordingInfo";
+    info.textContent =
+        recording.duration.toFixed(2) + " s · " +
+        recording.source + " · " +
+        recording.mode + " · " +
+        recording.channels + " channel(s) · " +
+        recording.createdAt.toLocaleTimeString();
+
+    const audio = document.createElement("audio");
+    audio.controls = true;
+    audio.src = recording.url;
+
+    const buttons = document.createElement("div");
+    buttons.className = "cardButtons";
+
+    const analyzeBtn = document.createElement("button");
+    analyzeBtn.className = "smallBtn analyzeBtn";
+    analyzeBtn.textContent = "Analyze FFT";
+    analyzeBtn.onclick = () => analyzeRecording(recording.id);
+
+    const downloadBtn = document.createElement("button");
+    downloadBtn.className = "smallBtn downloadBtn";
+    downloadBtn.textContent = "Download WAV";
+    downloadBtn.onclick = () => downloadRecording(recording);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "smallBtn deleteBtn";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.onclick = () => deleteRecording(recording.id);
+
+    buttons.appendChild(analyzeBtn);
+    buttons.appendChild(downloadBtn);
+    buttons.appendChild(deleteBtn);
+
+    card.appendChild(title);
+    card.appendChild(info);
+    card.appendChild(audio);
+    card.appendChild(buttons);
+
+    recordingList.appendChild(card);
+  }
+}
+
+function updateAnalysisSourceSelect() {
+  const currentValue = analysisSourceSelect.value;
+
+  analysisSourceSelect.innerHTML = '<option value="live">Live buffer</option>';
+
+  for (const recording of recordings) {
+    const option = document.createElement("option");
+    option.value = "recording-" + recording.id;
+    option.textContent =
+        "Recording " + recording.number + " · " +
+        recording.source + " · " +
+        recording.mode + " · " +
+        recording.duration.toFixed(2) + " s";
+
+    analysisSourceSelect.appendChild(option);
+  }
+
+  const stillExists = Array.from(analysisSourceSelect.options).some(opt => opt.value === currentValue);
+
+  if (stillExists) {
+    analysisSourceSelect.value = currentValue;
+  }
+  
+  resetAnalysisSelection();
+}
+
+function analyzeRecording(recordingId) {
+  analysisSourceSelect.value = "recording-" + recordingId;
+  resetAnalysisSelection();
+  showTab("analyzeView");
+  plotNoiseSpectrum();
+}
+
+function downloadRecording(recording) {
+  const a = document.createElement("a");
+  const timestamp = recording.createdAt.toISOString().replace(/[:.]/g, "-");
+
+  a.href = recording.url;
+  a.download =
+    "wcm_recording_" +
+    recording.number +
+    "_" +
+    recording.source.replace(/\s+/g, "_").toLowerCase() +
+    "_" +
+    recording.mode +
+    "_" +
+    timestamp +
+    ".wav";
+
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  log("Recording " + recording.number + " downloaded.");
+}
+
+function deleteRecording(id) {
+  const target = recordings.find(r => r.id === id);
+
+  if (target) {
+    URL.revokeObjectURL(target.url);
+  }
+
+  recordings = recordings.filter(r => r.id !== id);
+
+  if (recordings.length === 0) {
+    startBtn.textContent = "Start";
+  }
+
+  renderRecordings();
+  updateAnalysisSourceSelect();
+
+  log("Recording deleted.");
+}

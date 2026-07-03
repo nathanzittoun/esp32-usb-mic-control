@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Acoustic Recording Console</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="appShell">
+    <header class="topBar">
+      <div class="brand">
+        <img class="logo" src="logo.png" alt="Weill Cornell Medicine logo" />
+        <div>
+          <h1>Acoustic Recording Console</h1>
+          <p>ESP32-S3 MEMS microphone acquisition</p>
+        </div>
+      </div>
+
+      <div class="deviceStatus">
+        <div id="statusDot" class="statusDot"></div>
+        <div>
+          <div id="status" class="statusText">Not connected</div>
+          <div class="statusSubtext">USB-C serial</div>
+        </div>
+      </div>
+    </header>
+
+    <nav class="tabBar">
+      <button class="tabBtn active" data-tab="recordView">Record</button>
+      <button class="tabBtn" data-tab="analyzeView">Analyze</button>
+      <button class="tabBtn" data-tab="libraryView">Library</button>
+    </nav>
+
+    <main>
+      <!-- RECORD VIEW -->
+      <section id="recordView" class="view activeView">
+        <div class="gridTwo">
+          <section class="card mainCard">
+            <div class="sectionHeader">
+              <div>
+                <h2>Recording</h2>
+                <p>Select the microphones, then start acquisition.</p>
+              </div>
+            </div>
+
+            <div class="sourceSelector">
+              <button class="sourceBtn active" data-source="mems">
+                <span>MEMS mics</span>
+                <small>ESP32 USB-C</small>
+              </button>
+
+              <button class="sourceBtn" data-source="computer">
+                <span>Computer mic</span>
+                <small>Built-in / external</small>
+              </button>
+            </div>
+
+            <div class="buttonRow">
+              <button id="connectBtn" class="primaryBtn">Connect MEMS device</button>
+              <button id="connectWifiBtn" class="primaryBtn">Connect MEMS Wi-Fi</button>
+              <button id="startBtn" class="successBtn" disabled>Start</button>
+              <button id="stopBtn" class="warningBtn" disabled>Stop</button>
+              <button id="calibrateNoiseBtn" class="secondaryBtn" disabled>Calibrate noise floor</button>
+              <button id="noiseAttenuatorBtn" class="secondaryBtn" disabled>Noise attenuator OFF</button>
+            </div>
+
+            <div id="modeSelector" class="modeSelector">
+              <button class="modeBtn active" data-mode="stereo">
+                <span>Stereo</span>
+                <small>Both mics</small>
+              </button>
+
+              <button class="modeBtn" data-mode="left">
+                <span>Left</span>
+                <small>Left mic only</small>
+              </button>
+
+              <button class="modeBtn" data-mode="right">
+                <span>Right</span>
+                <small>Right mic only</small>
+              </button>
+            </div>
+
+            <div class="metaRow">
+              <div id="durationBox" class="metaBox">Duration: 0.00 s</div>
+              <div id="sampleBox" class="metaBox">Frames: 0 · 2 channels</div>
+              <div id="recordingStateBox" class="metaBox">Idle</div>
+            </div>
+
+            <div class="plotCard">
+              <div class="plotHeader">
+                <h3>Live waveform</h3>
+                <span>Rolling view</span>
+              </div>
+              <canvas id="waveform" width="1000" height="300"></canvas>
+            </div>
+          </section>
+
+          <aside class="card">
+            <div class="sectionHeader compact">
+              <div>
+                <h2>Signal health</h2>
+                <p>Live recording diagnostics.</p>
+              </div>
+            </div>
+
+            <div class="noiseDashboard">
+              <div class="noiseCard">
+                <div class="noiseLabel">RMS</div>
+                <div id="rmsDb" class="noiseValue">-- dBFS</div>
+                <div class="indicatorOuter"><div id="rmsBar" class="indicatorInner"></div></div>
+              </div>
+
+              <div class="noiseCard">
+                <div class="noiseLabel">Peak</div>
+                <div id="peakDb" class="noiseValue">-- dBFS</div>
+                <div class="indicatorOuter"><div id="peakBar" class="indicatorInner"></div></div>
+              </div>
+
+              <div class="noiseCard">
+                <div class="noiseLabel">Clipping</div>
+                <div id="clipPercent" class="noiseValue">0.00%</div>
+                <div class="indicatorOuter"><div id="clipBar" class="indicatorInner warning"></div></div>
+              </div>
+
+              <div class="noiseCard">
+                <div class="noiseLabel">60 Hz</div>
+                <div id="hum60" class="noiseValue">--</div>
+                <div class="indicatorOuter"><div id="hum60Bar" class="indicatorInner danger"></div></div>
+              </div>
+
+              <div class="noiseCard">
+                <div class="noiseLabel">120 Hz</div>
+                <div id="hum120" class="noiseValue">--</div>
+                <div class="indicatorOuter"><div id="hum120Bar" class="indicatorInner danger"></div></div>
+              </div>
+
+              <div class="noiseCard">
+                <div class="noiseLabel">Rumble</div>
+                <div id="rumbleLevel" class="noiseValue">--</div>
+                <div class="indicatorOuter"><div id="rumbleBar" class="indicatorInner warning"></div></div>
+              </div>
+            </div>
+
+            <div class="noiseFloorBox">
+              <div class="noiseLabel">Noise floor</div>
+              <div id="noiseFloor" class="noiseFloorValue">Not calibrated</div>
+              <div id="noiseComment" class="noiseComment">Record silence, then calibrate.</div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ANALYZE VIEW -->
+      <section id="analyzeView" class="view">
+        <section class="card">
+          <div class="sectionHeader">
+            <div>
+              <h2>Frequency analysis</h2>
+              <p>Zoom into the FFT and export the frequency data.</p>
+            </div>
+          </div>
+
+          <div class="analysisToolbar">
+            <div class="fieldGroup">
+              <label>Source</label>
+              <select id="analysisSourceSelect">
+                <option value="live">Live buffer</option>
+              </select>
+            </div>
+
+            <div class="fieldGroup">
+              <label>From</label>
+              <input id="fftMinFreqInput" type="number" value="0" min="0" step="10" />
+            </div>
+
+            <div class="fieldGroup">
+              <label>To</label>
+              <input id="fftMaxFreqInput" type="number" value="8000" min="10" step="10" />
+            </div>
+
+            <button id="plotSpectrumBtn" class="primaryBtn" disabled>Plot FFT</button>
+            <button id="resetZoomBtn" class="secondaryBtn">Reset zoom</button>
+            <button id="downloadFftBtn" class="secondaryBtn" disabled>Download FFT</button>
+          </div>
+
+          <div class="quickZoomRow">
+            <button class="zoomPresetBtn" data-min="0" data-max="250">0–250 Hz</button>
+            <button class="zoomPresetBtn" data-min="0" data-max="1000">0–1 kHz</button>
+            <button class="zoomPresetBtn" data-min="1000" data-max="4000">1–4 kHz</button>
+            <button class="zoomPresetBtn" data-min="4000" data-max="8000">4–8 kHz</button>
+          </div>
+
+          <div class="plotCard">
+            <div class="plotHeader">
+              <h3>FFT spectrum</h3>
+              <span id="fftRangeLabel">0–8000 Hz</span>
+            </div>
+
+            <canvas id="spectrumCanvas" width="1200" height="420"></canvas>
+          </div>
+
+          <div class="plotCard waveformAnalyzeCard">
+            <div class="plotHeader">
+                <h3>Selected waveform region</h3>
+                <span id="selectedRangeLabel">No region selected</span>
+            </div>
+
+            <canvas id="analysisWaveformCanvas" width="1200" height="260"></canvas>
+
+            <p class="selectionHelp">
+                Drag the left or right boundary to choose the audio segment used for the FFT.
+            </p>
+          </div>
+
+          <div class="analysisSummary">
+            <div>
+              <h3>Dominant frequencies</h3>
+              <p id="dominantFrequencies">No FFT plotted yet.</p>
+            </div>
+
+            <div>
+              <h3>Interpretation</h3>
+              <p id="fftInterpretation">Record silence, then plot the FFT to identify noise bands.</p>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- LIBRARY VIEW -->
+      <section id="libraryView" class="view">
+        <section class="card">
+          <div class="sectionHeader">
+            <div>
+              <h2>Recordings</h2>
+              <p>Listen, download, or delete saved recordings.</p>
+            </div>
+
+            <div id="recordingCount" class="countPill">0 saved</div>
+          </div>
+
+          <div id="recordingList" class="recordingList">
+            <div class="empty">No recordings yet.</div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="log" class="logBox"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="noiseAttenuator.js"></script>
+  <script src="analysis.js"></script>
+  <script src="audio.js"></script>
+  <script src="serial.js"></script>
+  <script src="computerMic.js"></script>
+  <script src="wifi.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
