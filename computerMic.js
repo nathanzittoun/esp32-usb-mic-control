@@ -81,14 +81,15 @@ function addComputerMicSamples(samples) {
     return;
   }
 
-  samples = processNoiseAttenuator(samples, 1);
+  // Bake the filter into the stored audio when ON; store raw when OFF.
+  const stored = noiseAttenuatorEnabled ? processNoiseAttenuator(samples, 1) : samples;
 
-  currentChunks.push(samples);
-  currentFrameCount += samples.length;
-  currentValueCount += samples.length;
+  currentChunks.push(stored);
+  currentFrameCount += stored.length;
+  currentValueCount += stored.length;
 
-  for (let i = 0; i < samples.length; i++) {
-    liveSamples.push(samples[i]);
+  for (let i = 0; i < stored.length; i++) {
+    liveSamples.push(stored[i]);
   }
 
   if (liveSamples.length > MAX_LIVE_SAMPLES) {
@@ -96,6 +97,5 @@ function addComputerMicSamples(samples) {
   }
 
   updateCurrentStats();
-  drawLiveWaveform();
-  updateNoiseIndicators(liveSamples);
+  renderLiveMonitors();
 }

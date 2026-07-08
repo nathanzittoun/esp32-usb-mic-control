@@ -11,6 +11,11 @@ let inputSource = "mems";
 // options: "mems", "computer"
 let noiseAttenuatorEnabled = false;
 
+// Top-level app area: "rnd" (Record/Analyze/Library) or "clinical".
+let appMode = "rnd";
+// Metadata attached to the next saved recording (set by the clinical flow).
+let activeTestMeta = null;
+
 let memsConnectionType = "usb";
 // options: "usb", "wifi"
 
@@ -72,7 +77,6 @@ const peakDbEl = document.getElementById("peakDb");
 const clipPercentEl = document.getElementById("clipPercent");
 const hum60El = document.getElementById("hum60");
 const hum120El = document.getElementById("hum120");
-const rumbleLevelEl = document.getElementById("rumbleLevel");
 const noiseFloorEl = document.getElementById("noiseFloor");
 const noiseCommentEl = document.getElementById("noiseComment");
 const noiseAttenuatorBtn = document.getElementById("noiseAttenuatorBtn");
@@ -82,7 +86,6 @@ const peakBar = document.getElementById("peakBar");
 const clipBar = document.getElementById("clipBar");
 const hum60Bar = document.getElementById("hum60Bar");
 const hum120Bar = document.getElementById("hum120Bar");
-const rumbleBar = document.getElementById("rumbleBar");
 
 const spectrumCanvas = document.getElementById("spectrumCanvas");
 const spectrumCtx = spectrumCanvas.getContext("2d");
@@ -100,12 +103,58 @@ const logDiv = document.getElementById("log");
 const canvas = document.getElementById("waveform");
 const ctx = canvas.getContext("2d");
 
+const liveSpectrumCanvas = document.getElementById("liveSpectrum");
+const liveSpectrumCtx = liveSpectrumCanvas ? liveSpectrumCanvas.getContext("2d") : null;
+
+const liveSpectrogramCanvas = document.getElementById("liveSpectrogram");
+const liveSpectrogramCtx = liveSpectrogramCanvas ? liveSpectrogramCanvas.getContext("2d") : null;
+
+const analysisSpectrogramCanvas = document.getElementById("analysisSpectrogram");
+const analysisSpectrogramCtx = analysisSpectrogramCanvas ? analysisSpectrogramCanvas.getContext("2d") : null;
+
+// When recording over USB the ESP32 resets as the port opens, so the first
+// fraction of a second contains a power-on thump. Discard that many frames at
+// the start of a USB recording. Wi-Fi and the computer mic don't need it.
+let recordingWarmupFrames = 0;
+
 function log(message) {
   const line = document.createElement("div");
   const time = new Date().toLocaleTimeString();
   line.textContent = "[" + time + "] " + message;
   logDiv.appendChild(line);
   logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+function setAppMode(mode) {
+  appMode = mode;
+
+  const rnd = document.getElementById("rndMode");
+  const clinical = document.getElementById("clinicalMode");
+  if (rnd) rnd.hidden = mode !== "rnd";
+  if (clinical) clinical.hidden = mode !== "clinical";
+
+  document.querySelectorAll(".modeSwitchBtn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === mode);
+  });
+}
+
+// Route the live monitors to whichever area is active.
+function renderLiveMonitors() {
+  if (appMode === "clinical") {
+    drawClinicalMonitors();
+  } else {
+    drawLiveWaveform();
+    drawLiveSpectrum();
+    updateNoiseIndicators(liveSamples);
+  }
+}
+
+function clearActiveMonitors() {
+  clearCanvas();
+  clearLiveSpectrogram();
+  if (typeof clearClinicalMonitors === "function") {
+    clearClinicalMonitors();
+  }
 }
 
 function setStatus(message, state = "idle") {
@@ -159,6 +208,17 @@ function clearCanvas() {
   ctx.moveTo(0, canvas.height / 2);
   ctx.lineTo(canvas.width, canvas.height / 2);
   ctx.stroke();
+
+  // Amplitude axis (y): the waveform maps ±full-scale to ±0.42·height.
+  ctx.fillStyle = "#8a8a8d";
+  ctx.font = "11px -apple-system, BlinkMacSystemFont, Arial";
+  ctx.fillText("+1.0", 6, canvas.height / 2 - canvas.height * 0.42 + 11);
+  ctx.fillText("0", 6, canvas.height / 2 - 4);
+  ctx.fillText("-1.0", 6, canvas.height / 2 + canvas.height * 0.42 - 3);
+  ctx.fillText("amplitude (× full scale)", 6, 14);
+
+  // Time axis (x): the rolling buffer holds the most recent ~1 s.
+  ctx.fillText("time →  (~1 s rolling)", canvas.width - 150, canvas.height - 8);
 }
 
 function drawLiveWaveform() {
@@ -208,6 +268,12 @@ async function startRecording() {
   liveSamples = [];
   byteBuffer = [];
 
+  // Drop ~0.2 s of USB start-up transient; no warm-up needed on Wi-Fi/computer.
+  recordingWarmupFrames =
+    inputSource === "mems" && memsConnectionType === "usb"
+      ? Math.round(SAMPLE_RATE * 0.2)
+      : 0;
+
   isRecording = true;
 
   startBtn.disabled = true;
@@ -215,7 +281,7 @@ async function startRecording() {
 
   setStatus("Recording", "recording");
   updateCurrentStats();
-  clearCanvas();
+  clearActiveMonitors();
 
   if (inputSource === "mems") {
     await sendMemsCommand("START");
@@ -277,7 +343,11 @@ async function setInputSource(source) {
   calibrateNoiseBtn.disabled = true;
   plotSpectrumBtn.disabled = true;
   noiseAttenuatorBtn.disabled = true;
+
+  // The Wi-Fi button only makes sense for the MEMS device; hide it entirely
+  // for the computer mic.
   connectWifiBtn.disabled = source !== "mems";
+  connectWifiBtn.style.display = source === "mems" ? "" : "none";
 
   if (source === "mems") {
     connectBtn.textContent = "Connect MEMS device";
@@ -298,6 +368,10 @@ async function setInputSource(source) {
 }
 
 async function disconnectCurrentSource() {
+  // This path is always a deliberate teardown, so suppress the serial/Wi-Fi
+  // auto-reconnect logic that only fires on unexpected drops.
+  serialIntentionalClose = true;
+
   try {
     if (reader) {
       await reader.cancel();
@@ -353,12 +427,7 @@ async function disconnectCurrentSource() {
   }
 
   try {
-    if (wifiSocket) {
-      wifiSocket.close();
-      wifiSocket = null;
-    }
-
-    wifiConnected = false;
+    disconnectWifi();
   } catch (error) {
     console.warn("Wi-Fi disconnect issue:", error);
   }

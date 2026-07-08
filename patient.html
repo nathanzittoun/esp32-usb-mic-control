@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>AudioMX — Patient</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body class="patientWindowBody">
+  <section class="card patientPanel patientWindowPanel">
+    <div id="pGoBar" class="patientGoBar">Get ready…</div>
+
+    <div class="patientBody">
+      <div id="pCountNumber" class="patientCount"></div>
+      <div id="pTaskIcon" class="patientIcon">🫁</div>
+      <h2 id="pTaskTitle" class="patientTitle">Waiting for the clinician…</h2>
+      <ol id="pSteps" class="patientSteps"></ol>
+      <div id="pReads" class="patientReads" style="display:none"></div>
+      <div id="pReadyWrap" class="patientReadyWrap" style="display:none">
+        <button id="pReadyBtn" class="patientReadyBtn">I'm ready — start</button>
+      </div>
+    </div>
+
+    <div id="pTimerWrap" class="patientTimerWrap" style="display:none">
+      <div id="pTimerBar" class="patientTimerBar"></div>
+    </div>
+  </section>
+
+  <!-- Cache-bust so the pop-out never runs a stale copy of these scripts. -->
+  <script>
+    (function () {
+      var v = Date.now();
+      document.write('<scr' + 'ipt src="protocol.js?v=' + v + '"><\/scr' + 'ipt>');
+      document.write('<scr' + 'ipt src="patient-window.js?v=' + v + '"><\/scr' + 'ipt>');
+    })();
+  </script>
+</body>
+</html>

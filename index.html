@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Acoustic Recording Console</title>
+  <title>AudioMX — Voice &amp; Speech Platform</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -10,22 +10,33 @@
   <div class="appShell">
     <header class="topBar">
       <div class="brand">
-        <img class="logo" src="logo.png" alt="Weill Cornell Medicine logo" />
+        <img class="appIcon" src="AudioMXimagelogo.png" alt="AudioMX icon" />
         <div>
-          <h1>Acoustic Recording Console</h1>
-          <p>ESP32-S3 MEMS microphone acquisition</p>
+          <img class="wordmark" src="AudioMXnamelogo.png" alt="AudioMX" />
+          <p>Voice &amp; speech biomarker platform</p>
         </div>
+      </div>
+
+      <div class="partnerLogos">
+        <img src="logo.png" alt="Weill Cornell Medicine Otolaryngology" />
+        <img src="nyp_logo.png" alt="NewYork-Presbyterian" onerror="this.style.display='none'" />
       </div>
 
       <div class="deviceStatus">
         <div id="statusDot" class="statusDot"></div>
         <div>
           <div id="status" class="statusText">Not connected</div>
-          <div class="statusSubtext">USB-C serial</div>
+          <div class="statusSubtext">USB-C / Wi-Fi</div>
         </div>
       </div>
     </header>
 
+    <nav class="modeSwitch">
+      <button class="modeSwitchBtn active" data-mode="rnd">R&amp;D</button>
+      <button class="modeSwitchBtn" data-mode="clinical">Clinical Study</button>
+    </nav>
+
+    <div id="rndMode">
     <nav class="tabBar">
       <button class="tabBtn active" data-tab="recordView">Record</button>
       <button class="tabBtn" data-tab="analyzeView">Analyze</button>
@@ -62,7 +73,15 @@
               <button id="startBtn" class="successBtn" disabled>Start</button>
               <button id="stopBtn" class="warningBtn" disabled>Stop</button>
               <button id="calibrateNoiseBtn" class="secondaryBtn" disabled>Calibrate noise floor</button>
-              <button id="noiseAttenuatorBtn" class="secondaryBtn" disabled>Noise attenuator OFF</button>
+              <button id="noiseAttenuatorBtn" class="secondaryBtn" disabled title="When ON, the recording is cleaned (baked in). When OFF, the recording is raw.">Noise filter OFF</button>
+            </div>
+
+            <div class="wifiAddressRow">
+              <div class="fieldGroup">
+                <label for="wifiUrlInput">Wi-Fi address</label>
+                <input id="wifiUrlInput" type="text" value="ws://192.168.4.1:81" spellcheck="false" />
+              </div>
+              <small class="fieldHint">Default is the ESP32 access point. Change it if the device is on your network.</small>
             </div>
 
             <div id="modeSelector" class="modeSelector">
@@ -94,6 +113,22 @@
                 <span>Rolling view</span>
               </div>
               <canvas id="waveform" width="1000" height="300"></canvas>
+            </div>
+
+            <div class="plotCard">
+              <div class="plotHeader">
+                <h3>Live spectrum</h3>
+                <span>~0.25 s window · 0–8 kHz</span>
+              </div>
+              <canvas id="liveSpectrum" width="1000" height="220"></canvas>
+            </div>
+
+            <div class="plotCard">
+              <div class="plotHeader">
+                <h3>Live spectrogram</h3>
+                <span>0–8 kHz · time scrolls left</span>
+              </div>
+              <canvas id="liveSpectrogram" width="1000" height="240"></canvas>
             </div>
           </section>
 
@@ -136,11 +171,6 @@
                 <div class="indicatorOuter"><div id="hum120Bar" class="indicatorInner danger"></div></div>
               </div>
 
-              <div class="noiseCard">
-                <div class="noiseLabel">Rumble</div>
-                <div id="rumbleLevel" class="noiseValue">--</div>
-                <div class="indicatorOuter"><div id="rumbleBar" class="indicatorInner warning"></div></div>
-              </div>
             </div>
 
             <div class="noiseFloorBox">
@@ -201,6 +231,15 @@
             <canvas id="spectrumCanvas" width="1200" height="420"></canvas>
           </div>
 
+          <div class="plotCard">
+            <div class="plotHeader">
+              <h3>Spectrogram</h3>
+              <span>Selected region · frequency over time</span>
+            </div>
+
+            <canvas id="analysisSpectrogram" width="1200" height="300"></canvas>
+          </div>
+
           <div class="plotCard waveformAnalyzeCard">
             <div class="plotHeader">
                 <h3>Selected waveform region</h3>
@@ -237,7 +276,10 @@
               <p>Listen, download, or delete saved recordings.</p>
             </div>
 
-            <div id="recordingCount" class="countPill">0 saved</div>
+            <div class="libraryHeaderRight">
+              <div id="recordingCount" class="countPill">0 saved</div>
+              <button id="clearAllBtn" class="smallBtn deleteBtn">Clear all data</button>
+            </div>
           </div>
 
           <div id="recordingList" class="recordingList">
@@ -246,6 +288,150 @@
         </section>
       </section>
     </main>
+    </div><!-- /#rndMode -->
+
+    <!-- CLINICAL MODE -->
+    <div id="clinicalMode" hidden>
+      <nav class="clinTabs">
+        <button class="clinTabBtn active" data-ctab="patients">Patients</button>
+        <button class="clinTabBtn" data-ctab="exam">Exam</button>
+        <button class="clinTabBtn" data-ctab="chart">Patient chart</button>
+      </nav>
+
+      <!-- PATIENTS TAB -->
+      <section id="clinPatients" class="card clinPanel">
+        <div class="sectionHeader">
+          <div>
+            <h2>Patients</h2>
+            <p>Your patient database. Open one to run an exam.</p>
+          </div>
+          <button id="cNewPatientBtn" class="primaryBtn">+ New patient</button>
+        </div>
+        <div class="fieldGroup">
+          <label for="cPatientSearch">Search</label>
+          <input id="cPatientSearch" type="text" placeholder="Search by ID or name" />
+        </div>
+        <div id="cPatientTable" class="patientTable">
+          <div class="empty">No patients yet. Click “New patient”.</div>
+        </div>
+      </section>
+
+      <!-- EXAM TAB -->
+      <section id="clinExam" class="clinPanel" hidden>
+        <div class="clinicalGrid">
+          <section class="card clinicianPanel">
+            <div class="sectionHeader">
+              <div>
+                <h2>Exam</h2>
+                <p>Drive the protocol and watch the signal.</p>
+              </div>
+            </div>
+
+            <div id="cExamPatient" class="clinPatientMeta">No patient selected.</div>
+
+            <div class="clinSessionRow">
+              <button id="cNewSessionBtn" class="secondaryBtn">＋ New session</button>
+              <span id="cSessionLabel" class="clinSessionLabel">—</span>
+              <div class="fieldGroup clinNotesField">
+                <label for="cNotes">Session notes</label>
+                <input id="cNotes" type="text" placeholder="Optional notes for this session" />
+              </div>
+            </div>
+
+            <div class="clinConnectRow">
+              <button id="cConnectUsb" class="secondaryBtn">Connect MEMS (USB)</button>
+              <button id="cConnectWifi" class="secondaryBtn">Connect MEMS (Wi-Fi)</button>
+              <button id="cConnectComputer" class="secondaryBtn">Connect computer mic</button>
+              <button id="cPopoutBtn" class="secondaryBtn">Open patient view ↗</button>
+            </div>
+
+            <div class="clinOptionsRow">
+              <label class="consentCheck"><input type="checkbox" id="cConsent" /> Informed consent obtained</label>
+              <label class="consentCheck"><input type="checkbox" id="cSpeak" checked /> 🔊 Read prompts aloud</label>
+            </div>
+
+            <div class="clinTestBar">
+              <div class="clinTestBarHead">Protocol</div>
+              <div id="cTestList" class="clinTestList"></div>
+            </div>
+
+            <div class="clinRunHead">
+              <div>
+                <h3 id="cTestName">Sustained Vowel (MPT)</h3>
+                <p id="cTestNote" class="clinTestNote"></p>
+              </div>
+              <div class="clinRunBtns">
+                <button id="cStartBtn" class="successBtn">Start test</button>
+                <button id="cStopBtn" class="warningBtn" disabled>End test</button>
+              </div>
+            </div>
+
+            <div id="cGateBox" class="clinGate" style="display:none"></div>
+
+            <div class="clinMetrics">
+              <div class="noiseCard">
+                <div class="noiseLabel">RMS</div>
+                <div id="cRms" class="noiseValue">-- dBFS</div>
+                <div class="indicatorOuter"><div id="cLevelBar" class="indicatorInner"></div></div>
+              </div>
+              <div class="noiseCard">
+                <div class="noiseLabel">Peak</div>
+                <div id="cPeak" class="noiseValue">-- dBFS</div>
+              </div>
+              <div class="noiseCard">
+                <div class="noiseLabel">Clipping</div>
+                <div id="cClip" class="noiseValue">0.00%</div>
+              </div>
+            </div>
+
+            <div class="plotCard">
+              <div class="plotHeader"><h3>Waveform</h3><span>live</span></div>
+              <canvas id="cWaveform" width="1000" height="200"></canvas>
+            </div>
+            <div class="plotCard">
+              <div class="plotHeader"><h3>Spectrum</h3><span>0–8 kHz · dBFS</span></div>
+              <canvas id="cSpectrum" width="1000" height="200"></canvas>
+            </div>
+          </section>
+
+          <!-- Patient interface -->
+          <section class="card patientPanel">
+            <div id="pGoBar" class="patientGoBar">Get ready…</div>
+            <div class="patientBody">
+              <div id="pCountNumber" class="patientCount"></div>
+              <div id="pTaskIcon" class="patientIcon">🫁</div>
+              <h2 id="pTaskTitle" class="patientTitle">Say “Ahhh” for as long as you can</h2>
+              <ol id="pSteps" class="patientSteps"></ol>
+              <div id="pReads" class="patientReads"></div>
+              <div id="pReadyWrap" class="patientReadyWrap" style="display:none">
+                <button id="pReadyBtn" class="patientReadyBtn">I'm ready — start</button>
+              </div>
+            </div>
+            <div id="pTimerWrap" class="patientTimerWrap" style="display:none">
+              <div id="pTimerBar" class="patientTimerBar"></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- CHART TAB -->
+      <section id="clinChart" class="card clinPanel" hidden>
+        <div class="sectionHeader">
+          <div>
+            <h2>Patient chart</h2>
+            <p id="cChartPatient">No patient selected.</p>
+          </div>
+          <div class="chartExportBtns">
+            <button id="cExportPatientBtn" class="secondaryBtn">Download all sessions (ZIP)</button>
+            <button id="cExportFhirBtn" class="secondaryBtn">Export FHIR (JSON)</button>
+          </div>
+        </div>
+        <div id="cChartTrends" class="trendPanel"></div>
+        <div id="cChartFolders" class="sessionList">
+          <div class="empty">Open a patient from the Patients tab.</div>
+        </div>
+      </section>
+    </div><!-- /#clinicalMode -->
 
     <div id="log" class="logBox"></div>
   </div>
@@ -257,6 +443,12 @@
   <script src="serial.js"></script>
   <script src="computerMic.js"></script>
   <script src="wifi.js"></script>
+  <script src="db.js"></script>
+  <script src="zip.js"></script>
+  <script src="protocol.js"></script>
+  <script src="features.js"></script>
+  <script src="fhir.js"></script>
+  <script src="clinical.js"></script>
   <script src="main.js"></script>
 </body>
 </html>

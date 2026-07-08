@@ -27,6 +27,12 @@ function addSamples(payloadBytes) {
 
   const frameCount = payloadBytes.byteLength / 4;
 
+  // Skip the USB power-on transient at the very start of a recording.
+  if (recordingWarmupFrames > 0) {
+    recordingWarmupFrames -= frameCount;
+    return;
+  }
+
   let outputSamples;
 
   if (audioMode === "stereo") {
@@ -51,29 +57,33 @@ function addSamples(payloadBytes) {
 
   const channelCount = audioMode === "stereo" ? 2 : 1;
 
-  outputSamples = processNoiseAttenuator(outputSamples, channelCount);
+  // If the Noise filter is ON, bake it into the stored audio (one file). If
+  // OFF, store the raw capture. Record with it OFF for the raw signal used in
+  // biomarker analysis; ON for a cleaned take.
+  const stored = noiseAttenuatorEnabled
+    ? processNoiseAttenuator(outputSamples, channelCount)
+    : outputSamples;
 
   for (let i = 0; i < frameCount; i++) {
     if (audioMode === "stereo") {
-      const right = outputSamples[i * 2];
-      const left = outputSamples[i * 2 + 1];
+      const right = stored[i * 2];
+      const left = stored[i * 2 + 1];
       liveSamples.push(Math.round((right + left) / 2));
     } else {
-      liveSamples.push(outputSamples[i]);
+      liveSamples.push(stored[i]);
     }
   }
 
-  currentChunks.push(outputSamples);
+  currentChunks.push(stored);
   currentFrameCount += frameCount;
-  currentValueCount += outputSamples.length;
+  currentValueCount += stored.length;
 
   if (liveSamples.length > MAX_LIVE_SAMPLES) {
     liveSamples = liveSamples.slice(liveSamples.length - MAX_LIVE_SAMPLES);
   }
 
   updateCurrentStats();
-  drawLiveWaveform();
-  updateNoiseIndicators(liveSamples);
+  renderLiveMonitors();
 }
 
 function makeAnalysisSamples(samples, mode) {
@@ -108,6 +118,18 @@ function saveCurrentRecording() {
 
   const sourceLabel = inputSource === "mems" ? "MEMS" : "Computer mic";
 
+  // One audio per recording. It is already filtered if the Noise filter was ON
+  // during capture, or raw if it was OFF — no duplicate copy.
+  const filtered = noiseAttenuatorEnabled;
+
+  // Acoustic voice features (research preview) computed once, on save.
+  let features = null;
+  try {
+    features = extractVoiceFeatures(analysisSamples, SAMPLE_RATE);
+  } catch (e) {
+    console.warn("Feature extraction failed:", e);
+  }
+
   const recording = {
     id: Date.now(),
     number: recordingIndex++,
@@ -121,6 +143,9 @@ function saveCurrentRecording() {
     analysisSamples,
     blob,
     url,
+    filtered,
+    features,
+    meta: activeTestMeta,
     createdAt: new Date()
   };
 
@@ -128,6 +153,14 @@ function saveCurrentRecording() {
 
   renderRecordings();
   updateAnalysisSourceSelect();
+
+  // Persist so the recording survives a refresh (best-effort, non-blocking).
+  saveRecordingToDb(recording);
+
+  // Let the clinical view update its session review if this was a clinical take.
+  if (recording.meta && typeof onClinicalRecordingSaved === "function") {
+    onClinicalRecordingSaved(recording);
+  }
 
   log("Recording " + recording.number + " saved from " + sourceLabel + ".");
 }
@@ -188,29 +221,40 @@ function writeString(view, offset, string) {
 function renderRecordings() {
   recordingList.innerHTML = "";
 
-  recordingCount.textContent = recordings.length + " saved";
+  // R&D Library shows only R&D takes. Clinical takes (meta set) live in the
+  // patient chart on the Clinical side, not here.
+  const libraryRecordings = recordings.filter(r => !r.meta);
 
-  if (recordings.length === 0) {
+  recordingCount.textContent = libraryRecordings.length + " saved";
+
+  if (libraryRecordings.length === 0) {
     recordingList.innerHTML = '<div class="empty">No recordings yet.</div>';
     return;
   }
 
-  for (const recording of recordings) {
+  for (const recording of libraryRecordings) {
     const card = document.createElement("div");
     card.className = "recordingCard";
 
     const title = document.createElement("div");
     title.className = "recordingTitle";
-    title.textContent = "Recording " + recording.number;
+    title.textContent = recording.name || "Recording " + recording.number;
 
     const info = document.createElement("div");
     info.className = "recordingInfo";
-    info.textContent =
+    let infoText =
         recording.duration.toFixed(2) + " s · " +
         recording.source + " · " +
         recording.mode + " · " +
         recording.channels + " channel(s) · " +
         recording.createdAt.toLocaleTimeString();
+    if (recording.meta && recording.meta.patientId) {
+      infoText = recording.meta.patientId + " · " + recording.meta.testName + " · " + infoText;
+    }
+    if (recording.filtered) {
+      infoText = "🧹 filtered · " + infoText;
+    }
+    info.textContent = infoText;
 
     const audio = document.createElement("audio");
     audio.controls = true;
@@ -224,6 +268,11 @@ function renderRecordings() {
     analyzeBtn.textContent = "Analyze FFT";
     analyzeBtn.onclick = () => analyzeRecording(recording.id);
 
+    const renameBtn = document.createElement("button");
+    renameBtn.className = "smallBtn";
+    renameBtn.textContent = "Rename";
+    renameBtn.onclick = () => renameRecording(recording.id);
+
     const downloadBtn = document.createElement("button");
     downloadBtn.className = "smallBtn downloadBtn";
     downloadBtn.textContent = "Download WAV";
@@ -235,12 +284,21 @@ function renderRecordings() {
     deleteBtn.onclick = () => deleteRecording(recording.id);
 
     buttons.appendChild(analyzeBtn);
+    buttons.appendChild(renameBtn);
     buttons.appendChild(downloadBtn);
     buttons.appendChild(deleteBtn);
 
     card.appendChild(title);
     card.appendChild(info);
     card.appendChild(audio);
+
+    if (recording.features && typeof formatFeatures === "function") {
+      const feat = document.createElement("div");
+      feat.className = "featureLine";
+      feat.textContent = "🧬 " + formatFeatures(recording.features);
+      card.appendChild(feat);
+    }
+
     card.appendChild(buttons);
 
     recordingList.appendChild(card);
@@ -255,11 +313,16 @@ function updateAnalysisSourceSelect() {
   for (const recording of recordings) {
     const option = document.createElement("option");
     option.value = "recording-" + recording.id;
-    option.textContent =
-        "Recording " + recording.number + " · " +
-        recording.source + " · " +
-        recording.mode + " · " +
-        recording.duration.toFixed(2) + " s";
+
+    let label;
+    if (recording.name) {
+      label = recording.name;
+    } else if (recording.meta && recording.meta.patientId) {
+      label = recording.meta.patientId + " · " + recording.meta.testName;
+    } else {
+      label = "Recording " + recording.number + " · " + recording.source + " · " + recording.mode;
+    }
+    option.textContent = label + " · " + recording.duration.toFixed(2) + " s";
 
     analysisSourceSelect.appendChild(option);
   }
@@ -280,27 +343,63 @@ function analyzeRecording(recordingId) {
   plotNoiseSpectrum();
 }
 
-function downloadRecording(recording) {
-  const a = document.createElement("a");
+function sanitizeForFilename(text) {
+  return String(text).trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+// Build a descriptive base filename: a custom name if set, otherwise
+// PatientID__Session__Test__timestamp for clinical takes, else a generic name.
+function recordingBaseName(recording) {
   const timestamp = recording.createdAt.toISOString().replace(/[:.]/g, "-");
 
-  a.href = recording.url;
-  a.download =
-    "wcm_recording_" +
-    recording.number +
-    "_" +
-    recording.source.replace(/\s+/g, "_").toLowerCase() +
-    "_" +
-    recording.mode +
-    "_" +
-    timestamp +
-    ".wav";
+  if (recording.name) {
+    return sanitizeForFilename(recording.name) + "_" + timestamp;
+  }
 
+  if (recording.meta && recording.meta.patientId) {
+    return [
+      sanitizeForFilename(recording.meta.patientId),
+      sanitizeForFilename(recording.meta.sessionId || "session"),
+      sanitizeForFilename(recording.meta.testId || "test"),
+      timestamp
+    ].join("__");
+  }
+
+  return "audiomx_recording_" + recording.number + "_" +
+    recording.source.replace(/\s+/g, "_").toLowerCase() + "_" +
+    recording.mode + "_" + timestamp;
+}
+
+function triggerDownload(url, filename) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
 
+function downloadRecording(recording) {
+  triggerDownload(recording.url, recordingBaseName(recording) + ".wav");
   log("Recording " + recording.number + " downloaded.");
+}
+
+function renameRecording(id) {
+  const target = recordings.find(r => r.id === id);
+  if (!target) return;
+
+  const current = target.name || "Recording " + target.number;
+  const next = prompt("Rename recording:", current);
+  if (next === null) return;
+
+  target.name = next.trim() || null;
+
+  renderRecordings();
+  updateAnalysisSourceSelect();
+  if (typeof renderPatientChart === "function") renderPatientChart();
+  saveRecordingToDb(target);
+
+  log("Recording renamed to: " + (target.name || "Recording " + target.number));
 }
 
 function deleteRecording(id) {
@@ -315,6 +414,8 @@ function deleteRecording(id) {
   if (recordings.length === 0) {
     startBtn.textContent = "Start";
   }
+
+  deleteRecordingFromDb(id);
 
   renderRecordings();
   updateAnalysisSourceSelect();

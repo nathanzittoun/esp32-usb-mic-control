@@ -23,6 +23,14 @@ document.querySelectorAll(".tabBtn").forEach(btn => {
   });
 });
 
+document.querySelectorAll(".modeSwitchBtn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    setAppMode(btn.dataset.mode);
+  });
+});
+
+document.getElementById("clearAllBtn").addEventListener("click", clearAllData);
+
 connectBtn.addEventListener("click", connectSerial);
 connectWifiBtn.addEventListener("click", connectWifiMems);
 startBtn.addEventListener("click", startRecording);
@@ -63,6 +71,8 @@ document.querySelectorAll(".modeBtn").forEach(btn => {
 });
 
 clearCanvas();
+drawLiveSpectrum();
+clearLiveSpectrogram();
 drawSpectrumBackground();
 initAnalysisWaveformSelection();
 drawAnalysisWaveform();
@@ -70,3 +80,9 @@ updateCurrentStats();
 renderRecordings();
 updateAnalysisSourceSelect();
 setStatus("Not connected", "idle");
+
+initClinical();
+setAppMode("rnd");
+
+// Restore recordings persisted in this browser from earlier sessions.
+restoreRecordings();

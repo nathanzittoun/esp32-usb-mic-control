@@ -21,6 +21,14 @@ function goertzelMagnitude(samples, targetFreq, sampleRate) {
     return 0;
   }
 
+  // Remove DC first: a MEMS mic bias would otherwise leak energy into the
+  // low bins and inflate the 60/120 Hz readings.
+  let mean = 0;
+  for (let i = 0; i < n; i++) {
+    mean += samples[i];
+  }
+  mean /= n;
+
   const k = Math.round((n * targetFreq) / sampleRate);
   const omega = (2 * Math.PI * k) / n;
   const coeff = 2 * Math.cos(omega);
@@ -30,37 +38,17 @@ function goertzelMagnitude(samples, targetFreq, sampleRate) {
   let s2 = 0;
 
   for (let i = 0; i < n; i++) {
-    s0 = samples[i] + coeff * s1 - s2;
+    s0 = (samples[i] - mean) + coeff * s1 - s2;
     s2 = s1;
     s1 = s0;
   }
 
   const power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
 
-  return Math.sqrt(Math.max(power, 0)) / n;
-}
-
-function calculateRumbleIndex(samples) {
-  if (samples.length < 20) {
-    return 0;
-  }
-
-  let slowEnergy = 0;
-  let totalEnergy = 0;
-  let smooth = samples[0];
-
-  for (let i = 1; i < samples.length; i++) {
-    smooth = 0.98 * smooth + 0.02 * samples[i];
-
-    slowEnergy += Math.abs(smooth);
-    totalEnergy += Math.abs(samples[i]);
-  }
-
-  if (totalEnergy === 0) {
-    return 0;
-  }
-
-  return clamp(slowEnergy / totalEnergy, 0, 1);
+  // |X[k]| for a single Goertzel bin is A*n/2 for a tone of amplitude A, so
+  // divide by n and apply the one-sided factor of 2 to read back the tone
+  // amplitude. This keeps the hum meters on the same scale as the FFT.
+  return (2 * Math.sqrt(Math.max(power, 0))) / n;
 }
 
 function updateNoiseIndicators(samples) {
@@ -98,22 +86,18 @@ function updateNoiseIndicators(samples) {
   const hum60Db = dbfs(hum60Mag);
   const hum120Db = dbfs(hum120Mag);
 
-  const rumbleIndex = calculateRumbleIndex(samples);
-
   rmsDbEl.textContent = rmsDb.toFixed(1) + " dBFS";
   peakDbEl.textContent = peakDb.toFixed(1) + " dBFS";
   clipPercentEl.textContent = clippingPercent.toFixed(2) + "%";
 
   hum60El.textContent = hum60Db.toFixed(1) + " dB";
   hum120El.textContent = hum120Db.toFixed(1) + " dB";
-  rumbleLevelEl.textContent = Math.round(rumbleIndex * 100) + "%";
 
   rmsBar.style.width = dbToBar(rmsDb) + "%";
   peakBar.style.width = dbToBar(peakDb) + "%";
   clipBar.style.width = clamp(clippingPercent * 20, 0, 100) + "%";
   hum60Bar.style.width = dbToBar(hum60Db) + "%";
   hum120Bar.style.width = dbToBar(hum120Db) + "%";
-  rumbleBar.style.width = clamp(rumbleIndex * 100, 0, 100) + "%";
 
   if (calibratedNoiseFloorDb !== null) {
     const aboveNoise = rmsDb - calibratedNoiseFloorDb;
@@ -133,8 +117,6 @@ function updateNoiseIndicators(samples) {
     noiseCommentEl.textContent = "Clipping detected. Increase PCM_SHIFT in Arduino code to reduce gain.";
   } else if (hum60Db > -35 || hum120Db > -35) {
     noiseCommentEl.textContent = "Strong 60/120 Hz component detected. Possible electrical hum or power noise.";
-  } else if (rumbleIndex > 0.75 && rmsDb > -40) {
-    noiseCommentEl.textContent = "Low-frequency movement may be present. Check for handling noise or vibration.";
   }
 }
 
@@ -194,6 +176,320 @@ function drawSpectrumBackground(minFreq = 0, maxFreq = SAMPLE_RATE / 2) {
     spectrumCtx.font = "12px -apple-system, BlinkMacSystemFont, Arial";
     spectrumCtx.fillText(freq + " Hz", x + 6, spectrumCanvas.height - 10);
   }
+}
+
+let lastLiveSpectrumDraw = 0;
+
+// Live FFT for the Record page: the frequency content of roughly the last
+// 0.25 s of raw audio, redrawn a few times per second next to the waveform.
+function drawLiveSpectrum() {
+  if (!liveSpectrumCtx) {
+    return;
+  }
+
+  const now =
+    typeof performance !== "undefined" && performance.now
+      ? performance.now()
+      : Date.now();
+
+  // Throttle so a fast packet rate doesn't trigger an FFT on every chunk.
+  if (now - lastLiveSpectrumDraw < 80) {
+    return;
+  }
+  lastLiveSpectrumDraw = now;
+
+  const width = liveSpectrumCanvas.width;
+  const height = liveSpectrumCanvas.height;
+
+  liveSpectrumCtx.fillStyle = "#f0f0f2";
+  liveSpectrumCtx.fillRect(0, 0, width, height);
+
+  liveSpectrumCtx.strokeStyle = "#e2e2e6";
+  liveSpectrumCtx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    const y = (height / 4) * i;
+    liveSpectrumCtx.beginPath();
+    liveSpectrumCtx.moveTo(0, y);
+    liveSpectrumCtx.lineTo(width, y);
+    liveSpectrumCtx.stroke();
+  }
+
+  const windowSize = Math.min(liveSamples.length, 4096);
+  if (windowSize < 512) {
+    return;
+  }
+
+  const slice = Int16Array.from(liveSamples.slice(liveSamples.length - windowSize));
+  const spectrum = computeSpectrum(slice);
+  if (!spectrum) {
+    return;
+  }
+
+  // Feed the same FFT frame to the scrolling spectrogram.
+  pushLiveSpectrogramColumn(spectrum, now);
+
+  const maxFreq = SAMPLE_RATE / 2;
+  const minDb = -100;
+  const maxDb = 0;
+
+  liveSpectrumCtx.fillStyle = "#9a9a9d";
+  liveSpectrumCtx.font = "11px -apple-system, BlinkMacSystemFont, Arial";
+
+  // Frequency axis (x), labelled in kHz.
+  for (let f = 2000; f < maxFreq; f += 2000) {
+    const x = (f / maxFreq) * width;
+    liveSpectrumCtx.strokeStyle = "#e8e8ec";
+    liveSpectrumCtx.beginPath();
+    liveSpectrumCtx.moveTo(x, 0);
+    liveSpectrumCtx.lineTo(x, height);
+    liveSpectrumCtx.stroke();
+    liveSpectrumCtx.fillText(f / 1000 + " kHz", x + 3, height - 6);
+  }
+
+  // Level axis (y), labelled in dBFS.
+  liveSpectrumCtx.fillStyle = "#7a7a7d";
+  for (const d of [0, -25, -50, -75]) {
+    const y = height - ((d - minDb) / (maxDb - minDb)) * height;
+    liveSpectrumCtx.fillText(d + " dBFS", 6, d === 0 ? y + 12 : y - 3);
+  }
+
+  liveSpectrumCtx.strokeStyle = "#b31b1b";
+  liveSpectrumCtx.lineWidth = 1.6;
+  liveSpectrumCtx.beginPath();
+
+  let started = false;
+  for (let i = 0; i < spectrum.magnitudes.length; i++) {
+    const freq = spectrum.frequencies[i];
+    if (freq > maxFreq) {
+      break;
+    }
+
+    const db = spectrum.magnitudes[i];
+    const x = (freq / maxFreq) * width;
+    let y = height - ((db - minDb) / (maxDb - minDb)) * height;
+
+    if (y < 0) y = 0;
+    if (y > height) y = height;
+
+    if (!started) {
+      liveSpectrumCtx.moveTo(x, y);
+      started = true;
+    } else {
+      liveSpectrumCtx.lineTo(x, y);
+    }
+  }
+
+  liveSpectrumCtx.stroke();
+}
+
+// ---------------------------------------------------------------------------
+// Spectrogram (time on x, frequency on y, loudness as colour)
+// ---------------------------------------------------------------------------
+
+// Display range in dB for the live spectrogram. Absolute levels depend on the
+// device gain (PCM_SHIFT); this range gives usable contrast for speech.
+const LIVE_SG_MIN_DB = -95;
+const LIVE_SG_MAX_DB = -20;
+
+// Map a normalized value 0..1 to an [r,g,b] on a dark→purple→red→yellow→white
+// ramp (readable in both light and dark surroundings).
+function spectrogramColor(t) {
+  if (t < 0) t = 0;
+  if (t > 1) t = 1;
+
+  const stops = [
+    [0.0, 8, 8, 22],
+    [0.3, 45, 22, 110],
+    [0.55, 150, 32, 90],
+    [0.75, 228, 90, 40],
+    [0.9, 250, 190, 60],
+    [1.0, 255, 255, 220]
+  ];
+
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0]) {
+      const a = stops[i - 1];
+      const b = stops[i];
+      const f = (t - a[0]) / (b[0] - a[0]);
+      return [
+        Math.round(a[1] + f * (b[1] - a[1])),
+        Math.round(a[2] + f * (b[2] - a[2])),
+        Math.round(a[3] + f * (b[3] - a[3]))
+      ];
+    }
+  }
+
+  return [255, 255, 220];
+}
+
+// How fast the spectrogram scrolls, in pixels per second. At 1000 px wide this
+// gives roughly an 8-second window on screen.
+const SG_PIXELS_PER_SEC = 120;
+let lastLiveSpectrogramTime = 0;
+
+function clearLiveSpectrogram() {
+  if (!liveSpectrogramCtx) {
+    return;
+  }
+
+  lastLiveSpectrogramTime = 0;
+
+  liveSpectrogramCtx.fillStyle = "#0e0e14";
+  liveSpectrogramCtx.fillRect(
+    0,
+    0,
+    liveSpectrogramCanvas.width,
+    liveSpectrogramCanvas.height
+  );
+}
+
+// Scroll the live spectrogram left by the number of pixels that corresponds to
+// the real time elapsed since the last column, and paint the new block from a
+// single FFT frame. Advancing by elapsed time (instead of a fixed 1 px) is what
+// makes it fill the canvas in a few seconds rather than ~80.
+function pushLiveSpectrogramColumn(spectrum, now) {
+  if (!liveSpectrogramCtx) {
+    return;
+  }
+
+  const width = liveSpectrogramCanvas.width;
+  const height = liveSpectrogramCanvas.height;
+  const maxFreq = SAMPLE_RATE / 2;
+  const binCount = spectrum.magnitudes.length;
+
+  let advance;
+  if (!lastLiveSpectrogramTime) {
+    advance = 8;
+  } else {
+    advance = Math.round(((now - lastLiveSpectrogramTime) * SG_PIXELS_PER_SEC) / 1000);
+  }
+  if (advance < 1) advance = 1;
+  if (advance > 40) advance = 40; // cap after a pause so it doesn't jump
+  lastLiveSpectrogramTime = now;
+
+  // Shift the existing image left by `advance` pixels.
+  liveSpectrogramCtx.drawImage(liveSpectrogramCanvas, -advance, 0);
+
+  const column = liveSpectrogramCtx.createImageData(advance, height);
+
+  for (let y = 0; y < height; y++) {
+    const freq = (1 - y / height) * maxFreq;
+    let bin = Math.round((freq * spectrum.fftSize) / SAMPLE_RATE);
+    if (bin < 0) bin = 0;
+    if (bin >= binCount) bin = binCount - 1;
+
+    const db = spectrum.magnitudes[bin];
+    const t = (db - LIVE_SG_MIN_DB) / (LIVE_SG_MAX_DB - LIVE_SG_MIN_DB);
+    const c = spectrogramColor(t);
+
+    for (let xx = 0; xx < advance; xx++) {
+      const p = (y * advance + xx) * 4;
+      column.data[p] = c[0];
+      column.data[p + 1] = c[1];
+      column.data[p + 2] = c[2];
+      column.data[p + 3] = 255;
+    }
+  }
+
+  liveSpectrogramCtx.putImageData(column, width - advance, 0);
+}
+
+// Render a full static spectrogram of a block of samples (used in the Analyze
+// view for the selected region). Auto-scales the colour range to the loudest
+// bin so it adapts to the device gain.
+function renderStaticSpectrogram(ctx, canvas, samples, sampleRate) {
+  if (!ctx || !canvas) {
+    return;
+  }
+
+  const width = canvas.width;
+  const height = canvas.height;
+
+  ctx.fillStyle = "#0e0e14";
+  ctx.fillRect(0, 0, width, height);
+
+  if (!samples || samples.length < 256) {
+    return;
+  }
+
+  const windowN = 1024;
+  const binCount = windowN / 2;
+  const maxFreq = sampleRate / 2;
+
+  const win = new Float32Array(windowN);
+  for (let i = 0; i < windowN; i++) {
+    win[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (windowN - 1)));
+  }
+
+  const re = new Float32Array(windowN);
+  const im = new Float32Array(windowN);
+
+  const maxStart = Math.max(0, samples.length - windowN);
+  const dbGrid = new Float32Array(width * height);
+  let peakDb = -Infinity;
+
+  for (let x = 0; x < width; x++) {
+    const start =
+      maxStart > 0 ? Math.floor((x / (width - 1)) * maxStart) : 0;
+
+    let mean = 0;
+    for (let i = 0; i < windowN; i++) {
+      const idx = start + i;
+      mean += idx < samples.length ? samples[idx] : 0;
+    }
+    mean /= windowN;
+
+    for (let i = 0; i < windowN; i++) {
+      const idx = start + i;
+      const v = idx < samples.length ? samples[idx] : 0;
+      re[i] = (v - mean) * win[i];
+      im[i] = 0;
+    }
+
+    fftRadix2(re, im);
+
+    for (let y = 0; y < height; y++) {
+      const freq = (1 - y / height) * maxFreq;
+      let bin = Math.round((freq * windowN) / sampleRate);
+      if (bin < 0) bin = 0;
+      if (bin >= binCount) bin = binCount - 1;
+
+      const amp = (2 * Math.sqrt(re[bin] * re[bin] + im[bin] * im[bin])) / (windowN * 0.5);
+      const db = 20 * Math.log10(amp / 32768 + 1e-12);
+
+      dbGrid[y * width + x] = db;
+      if (db > peakDb) {
+        peakDb = db;
+      }
+    }
+  }
+
+  const displayMax = peakDb;
+  const displayMin = peakDb - 70;
+
+  const img = ctx.createImageData(width, height);
+  const data = img.data;
+
+  for (let i = 0; i < dbGrid.length; i++) {
+    const t = (dbGrid[i] - displayMin) / (displayMax - displayMin);
+    const c = spectrogramColor(t);
+    const p = i * 4;
+    data[p] = c[0];
+    data[p + 1] = c[1];
+    data[p + 2] = c[2];
+    data[p + 3] = 255;
+  }
+
+  ctx.putImageData(img, 0, 0);
+
+  // Frequency axis (y, kHz) and a time-direction hint, drawn on top.
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.font = "11px -apple-system, BlinkMacSystemFont, Arial";
+  for (const f of [2000, 4000, 6000]) {
+    const y = height - (f / maxFreq) * height;
+    ctx.fillText(f / 1000 + " kHz", 6, y - 3);
+  }
+  ctx.fillText("time →", width - 52, height - 8);
 }
 
 function nextPowerOfTwo(value) {
@@ -288,7 +584,7 @@ function computeSpectrum(samples) {
   const hopSize = Math.floor(N / 2);
   const binCount = Math.floor(N / 2);
 
-  const accumulatedMagnitude = new Float64Array(binCount);
+  const accumulatedPower = new Float64Array(binCount);
   const frequencies = new Float32Array(binCount);
 
   for (let k = 0; k < binCount; k++) {
@@ -298,11 +594,11 @@ function computeSpectrum(samples) {
   let frameCounter = 0;
 
   if (samples.length <= N) {
-    accumulateFftFrame(samples, 0, N, accumulatedMagnitude);
+    accumulateFftFrame(samples, 0, N, accumulatedPower);
     frameCounter = 1;
   } else {
     for (let start = 0; start + N <= samples.length; start += hopSize) {
-      accumulateFftFrame(samples, start, N, accumulatedMagnitude);
+      accumulateFftFrame(samples, start, N, accumulatedPower);
       frameCounter++;
     }
   }
@@ -313,9 +609,21 @@ function computeSpectrum(samples) {
 
   const magnitudes = new Float32Array(binCount);
 
+  // Hann window coherent gain (mean of the window). Dividing by it undoes the
+  // ~6 dB the window subtracts, so a full-scale sine reads ~0 dBFS.
+  const WINDOW_COHERENT_GAIN = 0.5;
+
   for (let k = 0; k < binCount; k++) {
-    const avgMag = accumulatedMagnitude[k] / frameCounter;
-    magnitudes[k] = 20 * Math.log10(avgMag / 32768 + 1e-12);
+    // Average power across frames (Welch), then take the RMS bin magnitude.
+    const binMag = Math.sqrt(accumulatedPower[k] / frameCounter);
+
+    // Convert the raw bin magnitude to a calibrated tone amplitude:
+    //   - divide by N and the window gain,
+    //   - apply the one-sided factor of 2 (DC bin excluded).
+    const oneSided = k === 0 ? 1 : 2;
+    const amplitude = (oneSided * binMag) / (N * WINDOW_COHERENT_GAIN);
+
+    magnitudes[k] = 20 * Math.log10(amplitude / 32768 + 1e-12);
   }
 
   return {
@@ -327,7 +635,7 @@ function computeSpectrum(samples) {
   };
 }
 
-function accumulateFftFrame(samples, start, N, accumulatedMagnitude) {
+function accumulateFftFrame(samples, start, N, accumulatedPower) {
   const real = new Float32Array(N);
   const imag = new Float32Array(N);
 
@@ -353,9 +661,11 @@ function accumulateFftFrame(samples, start, N, accumulatedMagnitude) {
 
   const binCount = Math.floor(N / 2);
 
+  // Accumulate power (|X[k]|^2). Averaging power across overlapping frames is
+  // the standard Welch estimate; the amplitude/dB conversion happens once in
+  // computeSpectrum after averaging.
   for (let k = 0; k < binCount; k++) {
-    const mag = Math.sqrt(real[k] * real[k] + imag[k] * imag[k]) / N;
-    accumulatedMagnitude[k] += mag;
+    accumulatedPower[k] += real[k] * real[k] + imag[k] * imag[k];
   }
 }
 
@@ -762,6 +1072,14 @@ function plotNoiseSpectrum() {
 
   lastSpectrum = spectrum;
   lastSpectrumSourceName = source.name;
+
+  // Spectrogram of the selected region, alongside the averaged FFT.
+  renderStaticSpectrogram(
+    analysisSpectrogramCtx,
+    analysisSpectrogramCanvas,
+    source.samples,
+    SAMPLE_RATE
+  );
 
   drawSpectrumBackground(minFreq, maxFreq);
 

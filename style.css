@@ -658,3 +658,565 @@ audio {
 .selectionHandle {
   cursor: ew-resize;
 }
+
+.wifiAddressRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 16px;
+  margin-bottom: 18px;
+}
+
+.wifiAddressRow .fieldGroup {
+  flex: 0 1 auto;
+}
+
+.wifiAddressRow #wifiUrlInput {
+  min-width: 220px;
+}
+
+.fieldHint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 340px;
+}
+
+.audioLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 10px 0 4px;
+}
+/* ===================================================================
+   AudioMX branding + Clinical section
+   =================================================================== */
+
+.appIcon {
+  width: 54px;
+  height: 54px;
+}
+
+.wordmark {
+  height: 34px;
+  display: block;
+}
+
+.partnerLogos {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-left: auto;
+  margin-right: 22px;
+}
+
+.partnerLogos img {
+  height: 34px;
+  width: auto;
+  object-fit: contain;
+  opacity: 0.92;
+}
+
+/* Mode switch (R&D vs Clinical) */
+.modeSwitch {
+  display: inline-flex;
+  gap: 6px;
+  background: #e9e9ee;
+  padding: 5px;
+  border-radius: 16px;
+  margin: 0 0 18px;
+}
+
+.modeSwitchBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 9px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.modeSwitchBtn.active {
+  background: var(--card-solid);
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Clinical split layout */
+.clinicalGrid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .clinicalGrid { grid-template-columns: 1fr; }
+}
+
+.clinSetup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.clinNotesField { flex: 1 1 260px; }
+.clinNotesField input { min-width: 100%; }
+
+.clinConnectRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.clinTestBarHead,
+.clinTestBar { margin-bottom: 6px; }
+
+.clinTestBarHead {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+
+.clinTestList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 18px;
+}
+
+.clinTestBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #eef1f6;
+  color: var(--ink);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  padding: 9px 13px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.clinTestBtn.active {
+  border-color: #3b6fb0;
+  background: #e2ecfa;
+}
+
+.clinTestIcon { font-size: 17px; }
+
+.clinRunHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.clinTestNote {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+  max-width: 460px;
+}
+
+.clinRunBtns { display: flex; gap: 10px; }
+
+.clinGate {
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.clinGate.gateOk { background: #e7f4ec; border: 1px solid #b6ddc5; color: #14663d; }
+.clinGate.gateWarn { background: #fdecec; border: 1px solid #f2c2c2; color: #8f1d1d; }
+.clinGate .gateHead { font-weight: 700; margin-bottom: 6px; }
+.clinGate ul { margin: 4px 0 10px 18px; }
+.clinGate .gateBtns { display: flex; gap: 10px; }
+
+.clinMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sessionList { display: flex; flex-direction: column; gap: 12px; }
+
+.sessionRow {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.sessionRow audio { width: 100%; margin: 8px 0; }
+.sessionRowHead { font-weight: 700; font-size: 14px; }
+
+/* Patient interface */
+.patientPanel {
+  background: linear-gradient(160deg, #eaf1fb, #dbe8f8);
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+}
+
+.patientGoBar {
+  background: #c9d3e0;
+  color: #45525f;
+  text-align: center;
+  font-weight: 800;
+  font-size: 17px;
+  padding: 14px;
+  border-radius: 14px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.patientGoBar.go {
+  background: var(--green);
+  color: #fff;
+  animation: goPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes goPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(24,121,78,0.5); }
+  50% { box-shadow: 0 0 0 10px rgba(24,121,78,0); }
+}
+
+.patientBody {
+  flex: 1;
+  text-align: center;
+  padding: 24px 10px;
+}
+
+.patientIcon { font-size: 72px; line-height: 1; margin-bottom: 8px; }
+
+.patientTitle {
+  font-size: 30px;
+  color: #23405f;
+  margin-bottom: 18px;
+  line-height: 1.2;
+}
+
+.patientSteps {
+  display: inline-block;
+  text-align: left;
+  font-size: 19px;
+  color: #2c3e50;
+  line-height: 1.7;
+  margin: 0 auto;
+}
+
+.patientReads {
+  margin-top: 18px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+
+.patientReadLine {
+  font-size: 22px;
+  color: #1f3550;
+  line-height: 1.5;
+  margin: 6px 0;
+}
+
+.patientTimerWrap {
+  height: 14px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.patientTimerBar {
+  height: 100%;
+  width: 100%;
+  background: var(--green);
+  transition: width 0.1s linear;
+}
+
+/* Patient "I'm ready" gate — shown after the instructions are read. */
+.patientReadyWrap { margin-top: 22px; text-align: center; }
+.patientReadyBtn {
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  font-size: 26px;
+  font-weight: 800;
+  padding: 20px 40px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(24,121,78,0.35);
+  animation: goPulse 1.6s ease-in-out infinite;
+}
+.patientReadyBtn:hover { filter: brightness(1.05); }
+.patientReadyBtn:active { transform: translateY(1px); }
+
+/* Popped-out patient window (patient.html) fills the whole screen */
+.patientWindowBody {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(160deg, #eaf1fb, #dbe8f8);
+}
+
+.patientWindowPanel {
+  min-height: 100vh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* Patient-centric clinical chart */
+.clinPatientMeta {
+  background: #eef3fb;
+  border: 1px solid #d6e2f3;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #33506f;
+  margin-bottom: 16px;
+}
+
+.sessionBlock {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 14px;
+  background: #fff;
+}
+
+.sessionBlockHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--soft-line);
+}
+
+.chartRow {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--soft-line);
+}
+
+.chartRow:last-child { border-bottom: none; }
+.chartRowTitle { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.chartRow audio { width: 100%; margin-bottom: 6px; }
+
+/* Patient pop-out window: center content on the big screen */
+.patientWindowPanel {
+  justify-content: space-between;
+}
+
+.patientWindowPanel .patientBody {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.libraryHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ---- Clinical sub-tabs + patient database + session folders ---- */
+.clinTabs {
+  display: inline-flex;
+  gap: 6px;
+  background: #e9e9ee;
+  padding: 5px;
+  border-radius: 14px;
+  margin-bottom: 18px;
+}
+.clinTabBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.clinTabBtn.active {
+  background: var(--card-solid);
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.patientTable { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.patientRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.patientRow.active { border-color: #3b6fb0; background: #eef3fb; }
+.patientRowMain { font-size: 15px; }
+.patientRowName { color: var(--muted); font-weight: 600; }
+.patientRowMeta { color: var(--muted); font-size: 13px; margin-left: auto; }
+.patientRowActions { display: flex; gap: 8px; }
+
+.clinSessionRow {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 6px 0 16px;
+}
+.clinSessionLabel {
+  background: #eef3fb;
+  border: 1px solid #d6e2f3;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #33506f;
+}
+.clinSessionRow .clinNotesField { flex: 1 1 240px; }
+
+.sessionFolder {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 14px 12px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+.sessionFolderHead {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink);
+  padding: 6px 0;
+  list-style: none;
+}
+.sessionFolderHead::-webkit-details-marker { display: none; }
+.sessionFolder .smallBtn { margin: 6px 0; }
+
+/* ---- Features / AI card, consent, spoken toggle, countdown number ---- */
+.clinOptionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 0 0 16px;
+}
+.consentCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.consentCheck input { width: auto; height: auto; min-width: 0; }
+
+.featureLine {
+  font-size: 12px;
+  color: #33506f;
+  background: #eef3fb;
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin: 6px 0;
+}
+
+.featureCard {
+  background: #f4f8fd;
+  border: 1px solid #dbe7f5;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 6px 0;
+}
+.featureHead {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #33506f;
+  margin-bottom: 4px;
+}
+.featureTag {
+  background: #dbe7f5;
+  color: #33506f;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  margin-left: 6px;
+}
+.featureBody { font-size: 13px; color: var(--ink); }
+.aiScore {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px dashed #cfdcec;
+  padding-top: 6px;
+}
+
+.chartExportBtns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Per-patient trend view (Chart tab) */
+.trendPanel:empty { display: none; }
+.trendPanel {
+  background: #f4f8fd;
+  border: 1px solid #dbe7f5;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.trendHead {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #33506f;
+  margin-bottom: 10px;
+}
+.trendGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.trendCard {
+  background: white;
+  border: 1px solid #dbe7f5;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.trendLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.trendValue { font-size: 18px; color: var(--ink); margin: 2px 0 4px; }
+.trendValue strong { font-size: 22px; }
+.trendDelta { font-size: 12px; color: var(--muted); font-weight: 400; }
+.trendNoData { font-size: 13px; color: var(--muted); font-weight: 400; }
+.trendSvg { display: block; width: 100%; max-width: 240px; }
+.trendFoot { margin-top: 10px; font-size: 11px; color: var(--muted); }
+
+.patientCount {
+  font-size: 96px;
+  font-weight: 800;
+  color: #18794e;
+  line-height: 1;
+  min-height: 0;
+}
+.patientCount:empty { display: none; }
