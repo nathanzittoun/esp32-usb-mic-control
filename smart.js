@@ -177,13 +177,21 @@ async function smartLoadPatient() {
   return smartFetch("Patient/" + smartSession.patient);
 }
 
-// List the patient's Observations.
+// List the patient's Observations. Epic requires a `category` on the search
+// (a bare patient search returns "Must have either code or category"), so we
+// try labs first, then vital signs.
 async function smartListObservations() {
-  return smartFetch("Observation?patient=" + encodeURIComponent(smartSession.patient) + "&_count=20");
+  for (const category of ["laboratory", "vital-signs"]) {
+    const bundle = await smartFetch("Observation?patient=" +
+      encodeURIComponent(smartSession.patient) + "&category=" + category + "&_count=20");
+    if (bundle.entry && bundle.entry.length) return bundle;
+  }
+  return { resourceType: "Bundle", type: "searchset", total: 0, entry: [] };
 }
 
-// Write one Observation into the chart. Pass a FHIR Observation object; we set
-// its subject to the launched patient automatically.
+// Write one Observation into the chart. NOTE: Epic forbids writing custom
+// Observations (returns 403) — only recognized Vital Signs are writable — so
+// for voice biomarkers use smartWriteDocumentReference() instead.
 async function smartWriteObservation(observation) {
   const obs = Object.assign({}, observation, {
     subject: { reference: "Patient/" + smartSession.patient }
@@ -192,5 +200,29 @@ async function smartWriteObservation(observation) {
     method: "POST",
     headers: { "Content-Type": "application/fhir+json" },
     body: JSON.stringify(obs)
+  });
+}
+
+// Write a voice-analysis note into the chart as a DocumentReference — the
+// path Epic actually supports for novel data. `text` is the report body.
+// (Epic may still require an encounter/clinician context in some configs;
+//  standalone patient launch can be restricted — treat this as best-effort.)
+async function smartWriteDocumentReference(text) {
+  const b64 = btoa(unescape(encodeURIComponent(text)));
+  const doc = {
+    resourceType: "DocumentReference",
+    status: "current",
+    docStatus: "final",
+    type: {
+      coding: [{ system: "http://loinc.org", code: "34117-2", display: "History and physical note" }],
+      text: "AudioMX voice acoustic analysis"
+    },
+    subject: { reference: "Patient/" + smartSession.patient },
+    content: [{ attachment: { contentType: "text/plain", data: b64, title: "AudioMX voice acoustic analysis" } }]
+  };
+  return smartFetch("DocumentReference", {
+    method: "POST",
+    headers: { "Content-Type": "application/fhir+json" },
+    body: JSON.stringify(doc)
   });
 }

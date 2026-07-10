@@ -33,7 +33,7 @@
     <strong>2. Patient</strong>
     <div id="patientInfo"></div>
     <button id="listBtn" class="secondary">List their Observations</button>
-    <button id="writeBtn" class="secondary">Write a test voice Observation (F0)</button>
+    <button id="writeBtn" class="secondary">Write a voice note (DocumentReference)</button>
   </div>
 
   <div class="card">
@@ -57,18 +57,13 @@
     };
 
     document.getElementById("writeBtn").onclick = async () => {
-      // A minimal, US-Core-shaped voice Observation (mean F0).
-      const obs = {
-        resourceType: "Observation",
-        meta: { profile: ["http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-clinical-result"] },
-        status: "final",
-        category: [{ coding: [{ system: "http://terminology.hl7.org/CodeSystem/observation-category", code: "exam", display: "Exam" }] }],
-        code: { coding: [{ system: "http://audiomx.org/fhir/CodeSystem/acoustic-voice", code: "F0", display: "Fundamental frequency (mean)" }], text: "Fundamental frequency (mean)" },
-        effectiveDateTime: new Date().toISOString(),
-        valueQuantity: { value: 130, unit: "Hz", system: "http://unitsofmeasure.org", code: "Hz" }
-      };
-      try { const saved = await smartWriteObservation(obs); log("✅ Wrote Observation " + (saved.id || "") + " to the chart."); log(saved); }
-      catch (e) { log("ERROR: " + e.message + "  (Epic sandbox may block writes for some resources — reading is the key proof.)"); }
+      // Write voice biomarkers as a DocumentReference (the path Epic supports;
+      // custom Observations return 403).
+      const note = "AudioMX voice acoustic analysis\n" +
+        "F0 130 Hz · jitter 0.55% · shimmer 3.1% · HNR 22.4 dB · F1 352 / F2 996 Hz\n" +
+        "Recorded " + new Date().toISOString();
+      try { const saved = await smartWriteDocumentReference(note); log("✅ Wrote DocumentReference " + (saved.id || "") + " to the chart."); log(saved); }
+      catch (e) { log("ERROR: " + e.message + "  (Writing to Epic's sandbox often needs a clinician/encounter context; reading is the key proof.)"); }
     };
 
     // On load: if Epic just redirected us back with ?code=…, finish the login.
