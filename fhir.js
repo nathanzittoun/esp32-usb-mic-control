@@ -2,28 +2,40 @@
 //
 // Maps a patient and their recorded voice takes into a standard FHIR R4
 // transaction Bundle so the data can be ingested by a FHIR-capable EHR
-// (e.g. Epic at Weill Cornell / NYP ??). NOT CERTIFIED INTERFACE, see  notes at the 
-// bottom of the file and the mapping table for what full compliance would still require.
+// (e.g. Epic at Weill Cornell / NYP). This is a research-grade starting
+// point, not a certified interface — see the notes at the bottom of the file
+// and the mapping table for what full compliance would still require.
 //
 // Resource mapping (one Bundle per patient):
 //   Patient            ← the patient record (id, name, gender, age)
 //   Media              ← each WAV take (audio, inline base64, self-contained)
 //   Observation × N    ← each acoustic feature of a take (F0, HNR, jitter,
-//                        shimmer, formants) with UCUM units (Unified Code 
-//                        for Units of Measure), derivedFrom Media
+//                        shimmer, formants) with UCUM units, derivedFrom Media
 //   DiagnosticReport   ← ties one take's Observations + Media together
 //
 // The Bundle is a "transaction": every entry has a urn:uuid fullUrl and a
 // POST request, so a FHIR server can accept the whole thing in one call and
 // wire up the internal references itself.
+//
+// Patient and Observation are tagged with US Core R4 profiles (meta.profile)
+// and carry the US-Core-required fields (typed MRN identifier, structured
+// HumanName, category/value with UCUM), so a US-realm EHR like Epic will
+// recognize them. The acoustic measure codes are still project-local pending
+// alignment with the NIH Bridge2AI VBAI voice-biomarker IG (2c).
 
-// Local code system for the acoustic measures. These voice-biomarker metrics
-// have no clean LOINC (Logical Observation Identifiers, Names and Codes) codes today, 
-// so we bind them to a project system and carry a human-readable display. 
-// Swap to LOINC/SNOMED when codes are chosen.
-
+// Local code system for the acoustic measures. There are no standard LOINC
+// codes for jitter/shimmer/HNR/F0 today, so we bind them to a project system
+// and carry a human-readable display. The natural target to align these with
+// is the NIH Bridge2AI "Voice as a Biomarker for AI" (VBAI) FHIR IG
+// (kind-lab/voice-biomarker-fhir), the emerging community standard — see 2c.
 const FHIR_ACOUSTIC_SYSTEM = "http://audiomx.org/fhir/CodeSystem/acoustic-voice";
 const FHIR_PATIENT_SYSTEM = "http://audiomx.org/fhir/identifier/patient";
+
+// US Core R4 profile canonicals. Tagging resources with meta.profile is what
+// lets a US-realm EHR (e.g. Epic) recognize and validate them as US Core.
+const US_CORE = "http://hl7.org/fhir/us/core/StructureDefinition/";
+const US_CORE_PATIENT = US_CORE + "us-core-patient";
+const US_CORE_OBSERVATION = US_CORE + "us-core-observation-clinical-result";
 
 const FHIR_FEATURES = [
   { key: "f0", code: "F0", display: "Fundamental frequency (mean)", unit: "Hz", ucum: "Hz", digits: 1 },
@@ -36,6 +48,7 @@ const FHIR_FEATURES = [
 
 function fhirUuid() {
   if (window.crypto && crypto.randomUUID) return "urn:uuid:" + crypto.randomUUID();
+  // Fallback (older browsers): timestamp + counter, still unique within a run.
   fhirUuid._n = (fhirUuid._n || 0) + 1;
   return "urn:uuid:audiomx-" + Date.now() + "-" + fhirUuid._n;
 }
@@ -58,13 +71,50 @@ async function blobToBase64(blob) {
   return btoa(binary);
 }
 
+// Escape text for embedding in the XHTML narrative <div>.
+function fhirEscape(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// A generated human-readable narrative. FHIR best practice (constraint
+// dom-6) is that every DomainResource carries one.
+function fhirNarrative(text) {
+  return {
+    status: "generated",
+    div: '<div xmlns="http://www.w3.org/1999/xhtml">' + fhirEscape(text) + "</div>"
+  };
+}
+
+// US Core requires a HumanName with at least family or given — a plain text
+// name is not enough. Split "Jean Doe" into given ["Jean"], family "Doe".
+function fhirHumanName(patient) {
+  const raw = String(patient.name || "").trim();
+  const label = raw || patient.id; // de-identified patients may have no name
+  const parts = label.split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return [{ text: label, family: label }];
+  return [{ text: label, family: parts[parts.length - 1], given: parts.slice(0, -1) }];
+}
+
 function fhirPatientResource(patient) {
   const res = {
     resourceType: "Patient",
-    identifier: [{ system: FHIR_PATIENT_SYSTEM, value: patient.id }],
+    meta: { profile: [US_CORE_PATIENT] },
+    text: fhirNarrative("Patient " + patient.id +
+      (patient.name ? " (" + patient.name + ")" : "") + " · " + fhirGender(patient.sex) +
+      (patient.age ? " · " + patient.age + " y" : "")),
+    // US Core wants an identifier typed as a Medical Record Number (MR).
+    identifier: [{
+      type: {
+        coding: [{ system: "http://terminology.hl7.org/CodeSystem/v2-0203", code: "MR", display: "Medical Record Number" }],
+        text: "Medical Record Number"
+      },
+      system: FHIR_PATIENT_SYSTEM,
+      value: patient.id
+    }],
+    name: fhirHumanName(patient),
     gender: fhirGender(patient.sex)
   };
-  if (patient.name) res.name = [{ text: patient.name }];
   // Age (no DOB is collected) is carried as an extension, in years.
   if (patient.age) {
     res.extension = [{
@@ -78,6 +128,9 @@ function fhirPatientResource(patient) {
 function fhirObservationResource(feature, value, patientRef, mediaRef, when, sessionId, testName) {
   return {
     resourceType: "Observation",
+    meta: { profile: [US_CORE_OBSERVATION] },
+    text: fhirNarrative(feature.display + ": " + Number(value.toFixed(feature.digits)) +
+      " " + feature.unit + " (" + (testName || "voice task") + ")"),
     status: "final",
     category: [{
       coding: [{ system: "http://terminology.hl7.org/CodeSystem/observation-category", code: "exam", display: "Exam" }]
@@ -102,6 +155,8 @@ function fhirObservationResource(feature, value, patientRef, mediaRef, when, ses
 async function fhirMediaResource(recording, patientRef, when, testName) {
   const media = {
     resourceType: "Media",
+    text: fhirNarrative("Audio recording (" + (testName || "voice task") + ") · " +
+      recording.duration.toFixed(2) + " s · audio/wav"),
     status: "completed",
     type: { coding: [{ system: "http://terminology.hl7.org/CodeSystem/media-type", code: "audio", display: "Audio" }] },
     subject: { reference: patientRef },
@@ -154,19 +209,26 @@ async function buildFhirBundle(patient, recordings) {
       }
     }
 
+    // FHIR rule: arrays/objects are never empty and properties are never
+    // null — an empty element must be omitted entirely. So we only attach
+    // result/conclusion when they actually have content.
+    const report = {
+      resourceType: "DiagnosticReport",
+      text: fhirNarrative("Voice acoustic analysis — " + (testName || "voice task") +
+        " · " + obsRefs.length + " measurement(s)"),
+      status: "final",
+      category: [{ coding: [{ system: "http://terminology.hl7.org/CodeSystem/v2-0074", code: "OTH", display: "Other" }] }],
+      code: { coding: [{ system: FHIR_ACOUSTIC_SYSTEM, code: "VOICE-ACOUSTIC", display: "Voice acoustic analysis" }], text: "Voice acoustic analysis — " + (testName || "voice task") },
+      subject: { reference: patientRef },
+      effectiveDateTime: when,
+      media: [{ link: { reference: mediaRef } }]
+    };
+    if (obsRefs.length) report.result = obsRefs.map(ref => ({ reference: ref }));
+    if (r.meta && r.meta.notes) report.conclusion = r.meta.notes;
+
     entries.push({
       fullUrl: fhirUuid(),
-      resource: {
-        resourceType: "DiagnosticReport",
-        status: "final",
-        category: [{ coding: [{ system: "http://terminology.hl7.org/CodeSystem/v2-0074", code: "OTH", display: "Other" }] }],
-        code: { coding: [{ system: FHIR_ACOUSTIC_SYSTEM, code: "VOICE-ACOUSTIC", display: "Voice acoustic analysis" }], text: "Voice acoustic analysis — " + (testName || "voice task") },
-        subject: { reference: patientRef },
-        effectiveDateTime: when,
-        result: obsRefs.map(ref => ({ reference: ref })),
-        media: [{ link: { reference: mediaRef } }],
-        conclusion: r.meta && r.meta.notes ? r.meta.notes : undefined
-      },
+      resource: report,
       request: { method: "POST", url: "DiagnosticReport" }
     });
   }
