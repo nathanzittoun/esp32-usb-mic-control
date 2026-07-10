@@ -356,6 +356,7 @@
               </div>
               <div id="cEhrPatient" class="clinEhrPatient"></div>
               <div id="cEhrObs" class="clinEhrObs"></div>
+              <div id="cEhrHint" class="clinEhrHint"></div>
             </div>
 
             <div class="clinOptionsRow">
@@ -461,8 +462,15 @@
   <script src="protocol.js"></script>
   <script src="features.js"></script>
   <script src="fhir.js"></script>
-  <script src="smart.js"></script>
-  <script src="ehr.js"></script>
+  <!-- Cache-bust the OAuth scripts so a stale copy can never break the Epic
+       login (GitHub Pages + browsers cache .js, which caused redirect drift). -->
+  <script>
+    (function () {
+      var v = Date.now();
+      document.write('<scr' + 'ipt src="smart.js?v=' + v + '"><\/scr' + 'ipt>');
+      document.write('<scr' + 'ipt src="ehr.js?v=' + v + '"><\/scr' + 'ipt>');
+    })();
+  </script>
   <script src="clinical.js"></script>
   <script src="main.js"></script>
 </body>

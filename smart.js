@@ -79,10 +79,27 @@ async function smartDiscover() {
 
 // ---- step 1: start the login -------------------------------------------
 
+// True when the page is being served from where the pinned redirect points,
+// so Epic will accept the round-trip. Launching from file:// or 127.0.0.1
+// (Live Server) sends a redirect Epic doesn't know and fails with
+// "The request is invalid".
+function smartOriginOk() {
+  try { return SMART.redirectUri.indexOf(location.origin + location.pathname) === 0 ||
+               SMART.redirectUri === location.origin + "/"; }
+  catch (e) { return false; }
+}
+
 async function smartLaunch() {
   if (!SMART.clientId || SMART.clientId.indexOf("PASTE_") === 0) {
     throw new Error("Set SMART.clientId to your Epic non-production Client ID first.");
   }
+  // Warn early if the current page can't be the redirect target — otherwise
+  // Epic just shows an opaque "request is invalid" after the user logs in.
+  if (location.protocol === "file:" || /^(127\.0\.0\.1|localhost)/.test(location.host)) {
+    throw new Error("Open the app at " + SMART.redirectUri +
+      " (not a local/Live Server URL) — Epic only accepts the registered address.");
+  }
+
   const cfg = await smartDiscover();
   const { verifier, challenge } = await smartPkce();
   const state = randomUrlSafe(16);
@@ -101,7 +118,10 @@ async function smartLaunch() {
     code_challenge: challenge,
     code_challenge_method: "S256"
   });
-  location.assign(cfg.authorization_endpoint + "?" + q.toString());
+  const authUrl = cfg.authorization_endpoint + "?" + q.toString();
+  // Log the exact request so a redirect mismatch is easy to spot in the console.
+  if (window.console) console.log("[SMART] redirect_uri =", SMART.redirectUri, "\n[SMART] authorize =", authUrl);
+  location.assign(authUrl);
 }
 
 // ---- step 3: handle the redirect back ----------------------------------

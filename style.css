@@ -1199,6 +1199,8 @@ audio {
 .ehrObsList { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink); }
 .ehrObsList li { margin: 3px 0; }
 .ehrObsDate { color: var(--muted); font-size: 11px; }
+.clinEhrHint { margin-top: 8px; font-size: 11px; color: var(--muted); word-break: break-all; }
+.clinEhrHint.warn { color: #b0442e; font-weight: 600; }
 
 /* Per-patient trend view (Chart tab) */
 .trendPanel:empty { display: none; }

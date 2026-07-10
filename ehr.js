@@ -24,11 +24,30 @@ function ehrPatientName(p) {
   return p.id;
 }
 
+// Show the exact redirect URI (and warn if this page can't be it) so a
+// mismatch with the Epic registration is obvious before the user connects.
+function renderEhrHint() {
+  const hint = ehrEl("cEhrHint");
+  if (!hint) return;
+  const onHost = !(location.protocol === "file:" ||
+    /^(127\.0\.0\.1|localhost)/.test(location.host));
+  if (onHost) {
+    hint.className = "clinEhrHint";
+    hint.textContent = "Sign-in returns to " + SMART.redirectUri +
+      " — this must be registered on Epic.";
+  } else {
+    hint.className = "clinEhrHint warn";
+    hint.textContent = "⚠ Open the app at " + SMART.redirectUri +
+      " to connect to Epic — a local/Live Server URL will be rejected.";
+  }
+}
+
 async function initEhr() {
   const connectBtn = ehrEl("cEhrConnect");
   if (connectBtn) connectBtn.addEventListener("click", connectEhr);
   const pullBtn = ehrEl("cEhrPull");
   if (pullBtn) pullBtn.addEventListener("click", pullEhrChart);
+  renderEhrHint();
 
   // If Epic just redirected us back (URL has ?code=…), finish the login and
   // jump the user to the Exam tab where the EHR panel lives.
