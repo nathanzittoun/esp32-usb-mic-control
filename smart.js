@@ -20,8 +20,9 @@
 
 const SMART = {
   // ---- EDIT AFTER REGISTERING ON fhir.epic.com --------------------------
-  // Paste your app's NON-PRODUCTION Client ID from the Epic app registration.
-  clientId: "PASTE_YOUR_EPIC_NON_PRODUCTION_CLIENT_ID_HERE",
+  // Epic app NON-PRODUCTION Client ID (public client — not a secret; it also
+  // travels in the login URL). Swap for the Production Client ID when going live.
+  clientId: "05b94f6d-d653-4db8-abc2-5a750eea6df6",
 
   // Epic's public R4 sandbox FHIR base (the "aud"/"iss"). Leave as-is for the
   // Epic sandbox; swap for WCM's real FHIR base later.
@@ -32,8 +33,10 @@ const SMART = {
   // on Epic (e.g. https://nathanzittoun.github.io/esp32-usb-mic-control/smart-test.html).
   get redirectUri() { return location.origin + location.pathname; },
 
-  // What we ask permission to do. patient/… = access to the launched patient.
-  scope: "openid fhirUser launch/patient patient/Patient.read patient/Observation.read patient/Observation.write"
+  // What we ask permission to do — must line up with the scopes registered on
+  // Epic. Reading Patient + Observation is the proof; DocumentReference is the
+  // supported write path (Epic doesn't allow writing custom Observations).
+  scope: "openid fhirUser launch/patient patient/Patient.read patient/Observation.read patient/DocumentReference.read patient/DocumentReference.write"
 };
 
 // In-memory session once connected: { accessToken, patient, tokenType, fhirBase }
