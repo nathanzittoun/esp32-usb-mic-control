@@ -28,10 +28,12 @@ const SMART = {
   // Epic sandbox; swap for WCM's real FHIR base later.
   iss: "https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4",
 
-  // The redirect URI Epic sends you back to. It is auto-derived from whatever
-  // page loads this script, and MUST EXACTLY match a redirect URI you register
-  // on Epic (e.g. https://nathanzittoun.github.io/esp32-usb-mic-control/smart-test.html).
-  get redirectUri() { return location.origin + location.pathname; },
+  // The redirect URI Epic sends you back to. PINNED to one fixed URL so it
+  // can't drift with how the page is opened — a mismatch is exactly what
+  // triggers Epic's "The request is invalid". Register this EXACT string on
+  // Epic. Epic will send you back here (the app root serves index.html, which
+  // loads ehr.js and finishes the login), no matter which page you launched from.
+  redirectUri: "https://nathanzittoun.github.io/esp32-usb-mic-control/",
 
   // What we ask permission to do — must line up with the scopes registered on
   // Epic. Reading Patient + Observation is the proof; DocumentReference is the
