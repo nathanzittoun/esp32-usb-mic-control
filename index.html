@@ -345,6 +345,19 @@
               <button id="cPopoutBtn" class="secondaryBtn">Open patient view ↗</button>
             </div>
 
+            <div id="cEhrCard" class="clinEhrCard">
+              <div class="clinEhrHead">
+                <span>🏥 Epic EHR (SMART on FHIR)</span>
+                <span id="cEhrStatus" class="clinEhrStatus">Not connected</span>
+              </div>
+              <div class="clinEhrBtns">
+                <button id="cEhrConnect" class="secondaryBtn">Connect to Epic (EHR)</button>
+                <button id="cEhrPull" class="secondaryBtn" style="display:none">Pull chart data</button>
+              </div>
+              <div id="cEhrPatient" class="clinEhrPatient"></div>
+              <div id="cEhrObs" class="clinEhrObs"></div>
+            </div>
+
             <div class="clinOptionsRow">
               <label class="consentCheck"><input type="checkbox" id="cConsent" /> Informed consent obtained</label>
               <label class="consentCheck"><input type="checkbox" id="cSpeak" checked /> 🔊 Read prompts aloud</label>
@@ -448,6 +461,8 @@
   <script src="protocol.js"></script>
   <script src="features.js"></script>
   <script src="fhir.js"></script>
+  <script src="smart.js"></script>
+  <script src="ehr.js"></script>
   <script src="clinical.js"></script>
   <script src="main.js"></script>
 </body>

@@ -1170,6 +1170,36 @@ audio {
 
 .chartExportBtns { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* Epic EHR (SMART on FHIR) panel in the Exam tab */
+.clinEhrCard {
+  background: #f4f8fd;
+  border: 1px solid #dbe7f5;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.clinEhrHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  color: #33506f;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.clinEhrStatus { font-size: 12px; font-weight: 600; color: var(--muted); }
+.clinEhrStatus.ok { color: #2e9e5b; }
+.clinEhrStatus.err { color: #c0492f; }
+.clinEhrBtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.clinEhrPatient { margin-top: 8px; font-size: 13px; color: var(--ink); }
+.clinEhrPatient:empty { display: none; }
+.clinEhrPatient .ehrId { color: var(--muted); font-size: 11px; }
+.clinEhrObs { margin-top: 8px; }
+.ehrObsHead { font-size: 12px; font-weight: 700; color: #33506f; margin-bottom: 4px; }
+.ehrObsList { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink); }
+.ehrObsList li { margin: 3px 0; }
+.ehrObsDate { color: var(--muted); font-size: 11px; }
+
 /* Per-patient trend view (Chart tab) */
 .trendPanel:empty { display: none; }
 .trendPanel {

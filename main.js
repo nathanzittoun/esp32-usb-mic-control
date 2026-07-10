@@ -82,6 +82,7 @@ updateAnalysisSourceSelect();
 setStatus("Not connected", "idle");
 
 initClinical();
+initEhr();
 setAppMode("rnd");
 
 // Restore recordings persisted in this browser from earlier sessions.
